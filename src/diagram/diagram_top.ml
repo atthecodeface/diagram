@@ -21,6 +21,7 @@ module Option   = Batteries.Option
 
 open Diaglib
 
+(*
 let _ =
   let g = Layout.Grid.make [(0,1,0.1);
                             (0,2,0.5);
@@ -28,19 +29,22 @@ let _ =
                             (1,2,0.8);
                             (0,17,0.120);
             ] in
-    let r = Layout.Grid.find_row_positions g in
+    let r = g.positions in
     List.iter (fun (r,s) -> Printf.printf "Row %d at %f\n" r s) r
-
+ *)
 
 (*a Top level *)
 let main () =
     let f = Font.make  "Arial embedded" 10. 3. 5. in
-    let t = Element.make_text [Grid (0,0,1,1);] "t0" (TextInt.make f 11. (Color.None) (Color.black) ["Some text"; ]) in
-    let b = Element.make_box Properties.[Border (1.,1.,1.,1.);] "b0" [t] in
-    let bbox = Element.get_min_bbox b in
-    let (d0,d1,d2,d3) = bbox in
-    Printf.printf "Bbox %f,%f %f,%f\n" d0 d1 d2 d3;
-    () (*let b = Box.make (Primitives.th_make "f0") *)
+    let t0 = Element.make_text [Grid (0,0,1,1);] "t0" (TextInt.make f 11. (Color.None) (Color.black) ["Some text"; ]) in
+    let t1 = Element.make_text [Grid (1,0,1,1);] "t1" (TextInt.make f 11. (Color.None) (Color.black) ["Some More text"; ]) in
+    let b = Element.make_box Properties.[Border (1.,1.,1.,1.);] "b0" [t0; t1] in
+    let diag = Element.make_min_bbox b in
+    let diag = Element.make_layout_within_bbox diag (0.,0.,200.,150.) in
+    Element.show_layout diag "";
+    let svg = Element.render_svg diag 0 in
+    List.iter (fun x->Svg.pretty_print () x) svg;
+    ()
 let _ =
   main ()
 

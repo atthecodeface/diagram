@@ -79,6 +79,15 @@ module Rectangle = struct
       let (a0,a1,a2,a3) = a in
       let (b0,b1,b2,b3) = b in
       (a0-.b0, a1-.b1, a2+.b2, a3+.b3)
+    let union a b =
+      let (a0,a1,(a2:float),a3) = a in
+      let (b0,b1,(b2:float),b3) = b in
+      ((min a0 b0), (min a1 b1), (max a2 b2), (max a3 b3))
+    let intersect a b =
+      let (a0,a1,a2,a3) = a in
+      let (b0,b1,b2,b3) = b in
+      let (r0,r1,r2,r3) = (max a0 b0, max a1 b1, min a2 b2, min a3 b3) in
+      if ((r2<=r0) || (r3<=r1)) then zeros else (r0,r1,r2,r3)
     let mk_fixed r = Fixed r
     let value x n =
       match x with
@@ -94,6 +103,7 @@ module Rectangle = struct
     let get_height bbox_r =
       let (d0,d1,d2,d3) = bbox_r in
       d3-.d1
-    
+   
+    let str (a0,a1,a2,a3) = Printf.sprintf "(%f,%f,%f,%f)" a0 a1 a2 a3
 end
 

@@ -25,7 +25,7 @@ let pretty_print_open_tag indent close_tag f t =
     let close_string = if close_tag then "/>" else ">" in
     let attribute_string_list = List.map attribute_text t.attributes in
     let attribute_string = String.concat " " attribute_string_list in
-    let tag_string = String.concat "" [open_string; attribute_string; close_string] in
+    let tag_string = String.concat " " [open_string; attribute_string; close_string] in
     pretty_print_indented indent f t tag_string
 let pretty_print_close_tag indent f t =
     let close_string = Printf.sprintf "</%s>" t.tag_type in

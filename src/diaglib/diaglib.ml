@@ -20,6 +20,7 @@ module Properties = Properties
 module Color     = Primitives.Color
 module Rectangle = Primitives.Rectangle
 module Layout = Layout
+module Svg = Svg
 
 module Font = struct
     type t = {
@@ -46,6 +47,7 @@ module type LayoutElementType = sig
 
     val get_min_bbox : t -> Primitives.t_rect
     val make_layout_within_bbox : t -> Primitives.t_rect -> lt
+    val render_svg : t -> lt -> int -> Svg.t list
 end
 
 module PathInt : LayoutElementType = struct
@@ -54,6 +56,8 @@ module PathInt : LayoutElementType = struct
     let get_min_bbox t = (0.,0.,100.,20.)
     type lt = Primitives.t_rect
     let make_layout_within_bbox t bbox = bbox
+    let render_svg t lt i = 
+      []
 end
 
 module TextInt : sig
@@ -77,10 +81,13 @@ end = struct
                                      FloatAttr ("y", 0.);
         (Color.svg_attr t.fill "fill");
         (Color.svg_attr t.stroke "stroke");
-                    ] )
+                    ] [])
     let make font size fill stroke text = {font; size; fill; stroke; text}
     type lt = Primitives.t_rect
     let make_layout_within_bbox t bbox = bbox
+    let render_svg t lt i = 
+      let svg = svg_use t lt in
+      [svg]
 end
 
 module BoxInt : sig
@@ -94,6 +101,7 @@ end = struct
     let make _ = 0
     type lt = Primitives.t_rect
     let make_layout_within_bbox t bbox = bbox
+    let render_svg t lt i = []
 
 end
 
@@ -102,6 +110,7 @@ module LayoutElementFunc (E:LayoutElementType) = struct
     type lt = E.lt
     let get_min_bbox = E.get_min_bbox
     let make_layout_within_bbox = E.make_layout_within_bbox
+    let render_svg = E.render_svg
 end
 
 module Path = LayoutElementFunc(PathInt)
@@ -113,9 +122,11 @@ module type LayoutElementAggrType = sig
     type lt
     val get_min_bbox : et -> Primitives.t_rect
     val make_layout_within_bbox : et -> Primitives.t_rect -> lt
+    val render_svg : et -> lt -> int -> Svg.t list
 end
 
 module LayoutElement  = struct
+  exception Mismatch of string
   type et = | EBox  of Box.t
             | EText of Text.t
             | EPath of Path.t
@@ -135,6 +146,12 @@ module LayoutElement  = struct
       | EText e  -> LText  (Text.make_layout_within_bbox e bbox)
       | EPath e  -> LPath  (Path.make_layout_within_bbox e bbox)
       | EBox  e  -> LBox   (Box.make_layout_within_bbox e bbox)
+
+    let render_svg et lt zindex = 
+      match et with
+      | EText e -> (match lt with | LText l -> Text.render_svg e l zindex | _ -> raise (Mismatch "Not both texts"))
+      | EPath e -> (match lt with | LPath l -> Path.render_svg e l zindex | _ -> raise (Mismatch "Not both paths"))
+      | EBox  e -> []
 
 end
 
@@ -159,11 +176,21 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
         et : LE.et;
         content : et list;
       }
+    type etb = {
+        th : th;
+        et : LE.et;
+        min_bbox : Primitives.t_rect;
+        layout : Layout.t;
+        content_etb : etb list;
+      }
     type lt = {
         th : th;
         et : LE.et;
         lt : LE.lt;
-        content_layout : (et * lt) list;
+        layout : Layout.t;
+        ltr    : Layout.t_transform;
+        content_layout : lt list;
+        bbox : Primitives.t_rect;
       }
 
     (*f make_et - construct the hierarchy *)
@@ -175,17 +202,31 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
 
     (*f apply_stylesheet - map to new hierarchy with updated properties *)
 
-    (*f calculate_min_bbox *)
-    let rec get_min_bbox (et : et) =
-      let content_bbox             = LE.get_min_bbox et.et in
-      let content_layout_bbox_list = List.map (fun (x:et) -> (x.th.layout_properties, get_min_bbox x)) et.content in
-      let xd_yd_list = Layout.gather_grid content_layout_bbox_list in
-      let px_py_ax_ay_bbox_list = Layout.gather_place content_layout_bbox_list in
-      Layout.expand_bbox et.th.layout_properties content_bbox
+    (*f layout_content_create - create layout using any necessary et properties and etb content *)
+    let layout_content_create (et : et) etb_list =
+      let content_layout_properties_bbox = List.map (fun (x:etb)->(x.th.layout_properties,x.min_bbox)) etb_list in
+      Layout.create et.th.layout_properties content_layout_properties_bbox 
 
-    let make_layout_within_bbox (et : et) bbox = 
-      let layout = LE.make_layout_within_bbox et.et bbox in
-      { th=et.th; et=et.et; lt=layout; content_layout = []}
+    (*f make_min_bbox - make etb from et, i.e. create a structure with the min_bbox of the element given its properties *)
+    let rec make_min_bbox (et : et) : etb =
+      let content_etb   = List.map make_min_bbox et.content in
+      let element_bbox  = LE.get_min_bbox et.et in
+      let layout        = layout_content_create et content_etb in
+      let content_bbox  = Layout.get_min_bbox layout in
+      let merged_bbox   = Rectangle.union element_bbox content_bbox in
+      let min_bbox      = Layout.expand_bbox et.th.layout_properties merged_bbox in
+      { th=et.th; et=et.et; min_bbox; layout; content_etb }
+
+    (*f make_layout_within_bbox - make ltb from etb *)
+    let rec make_layout_within_bbox (etb : etb) bbox = 
+      let (ltr, bbox) = Layout.layout_within_bbox etb.layout bbox in
+      let lt = LE.make_layout_within_bbox etb.et bbox in
+      let layout_content_element (x : etb) =
+        let bbox = Layout.get_bbox_element etb.layout ltr x.th.layout_properties x.min_bbox in
+        make_layout_within_bbox x bbox
+      in
+      let content_layout = List.map layout_content_element etb.content_etb in
+      { th=etb.th; et=etb.et; lt; layout=etb.layout; ltr; content_layout; bbox;}
 
     (* finalize geometry *)
     (* get geometry field (float along line?) *)
@@ -193,6 +234,17 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     (*let svg =
     let child_svg = 
      *)
+    let rec show_layout lt indent =
+      Printf.printf "%sid '%s' : bbox '%s'\n" indent lt.th.hdr.id (Rectangle.str lt.bbox);
+      let indent = String.concat "" ["  "; indent] in
+      List.iter (fun x -> show_layout x indent) lt.content_layout
+
+    (*f render_svg lt index - return a list of SVG tags that make up the element *)
+    let rec render_svg lt zindex =
+      let content_svg   = List.fold_left (fun a x -> a @ (render_svg x zindex)) [] lt.content_layout in
+      let element_svg   = LE.render_svg lt.et lt.lt zindex in
+      Layout.render_svg lt.layout lt.ltr (content_svg @ element_svg) 
+
 end
 
 module Element = struct
