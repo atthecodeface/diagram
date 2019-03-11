@@ -150,24 +150,24 @@ end
 
  *)
 module ElementFunc (LE : LayoutElementAggrType) = struct
-    type t_th = {
+    type th = {
         hdr                : Primitives.t_hdr;
         layout_properties  : Layout.t_layout_properties;
       }
-    type t_et = {
-        th : t_th;
+    type et = {
+        th : th;
         et : LE.et;
-        content : t_et list;
+        content : et list;
       }
-    type t_lt = {
-        th : t_th;
+    type lt = {
+        th : th;
         et : LE.et;
         lt : LE.lt;
-        content_layout : (t_et * t_lt) list;
+        content_layout : (et * lt) list;
       }
 
     (*f make_et - construct the hierarchy *)
-    let make_et properties id et content : t_et =
+    let make_et properties id et content : et =
         let layout_properties = Layout.make_layout_hdr properties in
         let hdr = Primitives.th_make id in
         let th = { hdr; layout_properties} in
@@ -176,14 +176,14 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     (*f apply_stylesheet - map to new hierarchy with updated properties *)
 
     (*f calculate_min_bbox *)
-    let rec get_min_bbox (et : t_et) =
+    let rec get_min_bbox (et : et) =
       let content_bbox             = LE.get_min_bbox et.et in
-      let content_layout_bbox_list = List.map (fun (x:t_et) -> (x.th.layout_properties, get_min_bbox x)) et.content in
+      let content_layout_bbox_list = List.map (fun (x:et) -> (x.th.layout_properties, get_min_bbox x)) et.content in
       let xd_yd_list = Layout.gather_grid content_layout_bbox_list in
       let px_py_ax_ay_bbox_list = Layout.gather_place content_layout_bbox_list in
       Layout.expand_bbox et.th.layout_properties content_bbox
 
-    let make_layout_within_bbox (et : t_et) bbox = 
+    let make_layout_within_bbox (et : et) bbox = 
       let layout = LE.make_layout_within_bbox et.et bbox in
       { th=et.th; et=et.et; lt=layout; content_layout = []}
 
