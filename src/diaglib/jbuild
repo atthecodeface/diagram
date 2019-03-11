@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library (
+  (name diaglib)
+  (public_name diaglib)
+  (libraries (
+    batteries
+  ))
+))
+

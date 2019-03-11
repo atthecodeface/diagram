@@ -1,0 +1,15 @@
+(jbuild_version 1)
+
+(executable (
+  (name diagram_top)
+  (libraries (
+    diaglib
+    batteries
+  ))
+))
+
+(alias (
+  (name    run_top)
+  (deps    (diagram_top.exe))
+  (action  (run ${<}))
+))
