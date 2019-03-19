@@ -21,12 +21,16 @@ module Color = struct
            | Rgb of (float * float * float)
            | Color of string
   let black = Rgb (0.,0.,0.)
+  let red   = Rgb (1.,0.,0.)
+  let green = Rgb (0.,1.,0.)
+  let blue  = Rgb (0.,0.,1.)
   let white = Rgb (1.,1.,1.)
-  let svg_attr t tag_name =
+  let is_none =  function | None -> true |_ -> false
+  let svg_attr tag_name t =
     match t with 
     | None    -> Svg.attribute_string tag_name "none"
     | Color s -> Svg.attribute_string tag_name s
-    | Rgb (r,g,b) -> Svg.attribute_string tag_name "some_rgb"
+    | Rgb (r,g,b) -> Svg.attribute_string tag_name (Printf.sprintf "rgb(%.0f,%.0f,%.0f)" (r*.255.) (g*.255.) (b*.255.))
 
 end
 
@@ -75,10 +79,11 @@ module Rectangle = struct
       let (a0,a1,a2,a3) = a in
       let (b0,b1,b2,b3) = b in
       (a0+.b0, a1+.b1, a2+.b2, a3+.b3)
-    let expand a b =
+    let expand ?scale:(scale=1.0) a b =
       let (a0,a1,a2,a3) = a in
       let (b0,b1,b2,b3) = b in
-      (a0-.b0, a1-.b1, a2+.b2, a3+.b3)
+      (a0-.scale*.b0, a1-.scale*.b1, a2+.scale*.b2, a3+.scale*.b3)
+    let shrink ?scale:(scale=1.0) a b = expand ~scale:(-. scale) a b
     let union a b =
       let (a0,a1,(a2:float),a3) = a in
       let (b0,b1,(b2:float),b3) = b in

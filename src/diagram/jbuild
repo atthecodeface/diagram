@@ -3,6 +3,8 @@
 (executable (
   (name diagram_top)
   (libraries (
+    structured_doc
+    stylesheet
     diaglib
     batteries
   ))

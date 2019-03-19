@@ -1,3 +1,7 @@
+(* Turn in to structured doc.ml
+Add support for xmlm input and output
+Add support for human-markup input and output
+ *)
 type t_attr = | StringAttr of (string * string)
               | FloatAttr of (string * float)
               | RectangleAttr of (string * (float*float*float*float))
@@ -5,6 +9,7 @@ type t_attr = | StringAttr of (string * string)
 type t = {
 tag_type : string;
 attributes : t_attr list;
+cdata    : string list;
 contents : t list;
   }
 let attribute_string n v = StringAttr (n, v)
@@ -17,9 +22,9 @@ let attribute_text t =
   | RectangleAttr (n,v) -> 
     let (d0, d1, d2, d3) = v in
     Printf.sprintf "%s='%f %f %f %f'" n d0 d1 d2 d3
-let tag tag_type attributes contents = { tag_type; attributes; contents; }
+let tag tag_type attributes contents cdata = { tag_type; attributes; contents; cdata; }
 let pretty_print_indented indent f t s =
-    Printf.printf "%s%s\n" indent s
+    Printf.fprintf f "%s%s\n" indent s
 let pretty_print_open_tag indent close_tag f t =
     let open_string = Printf.sprintf "<%s" t.tag_type in
     let close_string = if close_tag then "/>" else ">" in
@@ -32,13 +37,23 @@ let pretty_print_close_tag indent f t =
     pretty_print_indented indent f t close_string
     
 let rec pretty_print ?indent:(indent="") f t  =
-  match t.contents with 
-  | [] -> pretty_print_open_tag indent true f t
-  | _  ->
-     ( pretty_print_open_tag indent false f t ;
-       List.iter (fun c -> pretty_print ~indent:(String.concat " " ["  "; indent]) f c) t.contents;
-       pretty_print_close_tag indent f t
-     )
+  match t.cdata with
+  | [] -> (
+    match t.contents with 
+    | [] -> pretty_print_open_tag indent true f t
+    | _  ->
+       ( pretty_print_open_tag indent false f t ;
+         List.iter (fun c -> pretty_print ~indent:(String.concat " " ["  "; indent]) f c) t.contents;
+         pretty_print_close_tag indent f t
+       )
+  )
+  | _ -> (
+       ( pretty_print_open_tag indent false f t ;
+         List.iter (fun c -> pretty_print ~indent:(String.concat " " ["  "; indent]) f c) t.contents;
+         List.iter (fun i->Printf.fprintf f "%s" i) t.cdata;
+         pretty_print_close_tag indent f t
+       )
+  )
        
 
 (*
@@ -53,17 +68,18 @@ let rec pretty_print ?indent:(indent="") f t  =
  *)
 
 let svg_print_hdr f = 
-    Printf.printf "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-    Printf.printf "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n";
+    Printf.fprintf f "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+    Printf.fprintf f "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n";
     ()
 
-let svg_doc contents =
+let svg_doc contents bbox =
   let attributes = [
-      (attribute_float "version" 1.2);
-      (attribute_rectangle "viewBox" (0., 0., 100., 100.));
+      (attribute_string "version" "1.2");
+      (attribute_string "xmlns" "http://www.w3.org/2000/svg");
+      (attribute_rectangle "viewBox" bbox);
       (attribute_string "preserveAspectRatio" "xMidYMid");
       (attribute_string "fill-rule" "evenodd");
       (attribute_float  "stroke-width" 28.222);
       (attribute_string "stroke-linejoin" "round");
       ] in
-    tag "svg" attributes contents
+    tag "svg" attributes contents []

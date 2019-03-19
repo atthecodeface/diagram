@@ -62,7 +62,7 @@ end
 
 module TextInt : sig
     include LayoutElementType
-    val make : Font.t -> float -> Color.t -> Color.t -> string list -> t
+    val make : Font.t -> float -> Color.t -> string list -> t
 end = struct 
     (* List of (?) text, font, style, base line, min font size, desired font size *)
     (* padding below lowest baseline, above upper baseline, to left of left-most pixel, to right of right-most pixel *)
@@ -70,20 +70,20 @@ end = struct
         font : Font.t;
         size : float;
         text : string list; (* One string per line *)
-        fill : Color.t;
-        stroke : Color.t;
+        color : Color.t;
     (* anchor / alignment *)
       }
+    type lt = Primitives.t_rect
     let r = Rectangle.mk_fixed (0.,0.,100.,20.)
     let get_min_bbox t = (0.,0.,100.,20.)
-    let svg_use t bbox = Svg.(tag "text" [(*StringAttr ("class", "TextShape");*)
+    let svg_use t lt = 
+      let (_,_,_,y) = lt in
+      Svg.(tag "text" [(*StringAttr ("class", "TextShape");*)
                                      FloatAttr ("x", 0.);
-                                     FloatAttr ("y", 0.);
-        (Color.svg_attr t.fill "fill");
-        (Color.svg_attr t.stroke "stroke");
-                    ] [])
-    let make font size fill stroke text = {font; size; fill; stroke; text}
-    type lt = Primitives.t_rect
+                                     FloatAttr ("y", y);
+        (Color.svg_attr "fill" t.color);
+                    ] [] t.text)
+    let make font size color text = {font; size; color; text}
     let make_layout_within_bbox t bbox = bbox
     let render_svg t lt i = 
       let svg = svg_use t lt in
@@ -179,9 +179,11 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     type etb = {
         th : th;
         et : LE.et;
-        min_bbox : Primitives.t_rect;
-        layout : Layout.t;
-        content_etb : etb list;
+        content_bbox : Primitives.t_rect;
+        element_bbox : Primitives.t_rect;
+        min_bbox     : Primitives.t_rect;
+        layout       : Layout.t;
+        content_etb  : etb list;
       }
     type lt = {
         th : th;
@@ -215,7 +217,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       let content_bbox  = Layout.get_min_bbox layout in
       let merged_bbox   = Rectangle.union element_bbox content_bbox in
       let min_bbox      = Layout.expand_bbox et.th.layout_properties merged_bbox in
-      { th=et.th; et=et.et; min_bbox; layout; content_etb }
+      { th=et.th; et=et.et; content_bbox; element_bbox; min_bbox; layout; content_etb }
 
     (*f make_layout_within_bbox - make ltb from etb *)
     let rec make_layout_within_bbox (etb : etb) bbox = 
@@ -230,10 +232,6 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
 
     (* finalize geometry *)
     (* get geometry field (float along line?) *)
-    (* generate svg *)
-    (*let svg =
-    let child_svg = 
-     *)
     let rec show_layout lt indent =
       Printf.printf "%sid '%s' : bbox '%s'\n" indent lt.th.hdr.id (Rectangle.str lt.bbox);
       let indent = String.concat "" ["  "; indent] in

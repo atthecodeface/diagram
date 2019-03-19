@@ -1,0 +1,230 @@
+type dtd       = Xmlm.dtd
+type name      = Xmlm.name
+type attribute = Xmlm.attribute
+type tag       = Xmlm.tag
+type signal    = Xmlm.signal
+type pos       = Xmlm.pos
+
+  type encoding = [
+    | `UTF_8 | `UTF_16 | `UTF_16BE | `UTF_16LE | `ISO_8859_1| `US_ASCII ]
+  type error = Xmlm.error
+exception Error = Xmlm.Error
+type source = [
+  | `Channel of in_channel | `String of int * string | `Fun of (unit -> int) ]
+
+type t_tagoc = [ | `TagOpen     of (bool * int * tag)  (* bra, depth, (name, attributes)  *)
+                 | `TagKet      of (int * name) (* depth, name  *)
+               ]
+
+type input = {
+    reader : Reader.t;
+    mutable tag_depth : int;
+    mutable pending_tag : t_tagoc option;
+    mutable tag_stack : tag list;
+  }
+
+let raise_error t e = raise (Error ((Reader.pos t.reader), e))
+let skip_whitespace  t = Reader.skip_whitespace t.reader
+let skip_at_least_one_whitespace  t = 
+    if (not (Reader.skip_at_least_one_whitespace t.reader)) then raise_error t `Malformed_char_stream
+let peek_char  t = Reader.peek_char t.reader
+let get_char   t = Reader.get_char t.reader
+let unget      t = Reader.unget t.reader
+let unget_char t = Reader.unget_char t.reader
+
+
+let string_of_revlist rl : string =
+    let n = List.length rl in
+    let s = Bytes.make n ' ' in
+    List.iteri (fun i x-> Bytes.unsafe_set s (n-1-i) (Char.chr x)) rl;
+    Bytes.to_string s
+
+let read_until ?(initial_letters:int list=[]) t stop_if illegal_if =
+    let rec build_revstring rl =
+      match get_char t with
+        | `Ch ch when (stop_if ch) -> rl
+        | `Ch ch when (not (illegal_if ch)) -> (
+          build_revstring (ch::rl)
+          )
+        | `Ch ch -> raise_error t `Malformed_char_stream
+        | _ -> raise_error t `Unexpected_eoi
+    in
+    string_of_revlist (build_revstring initial_letters)
+
+let read_while ?(initial_letters:int list=[]) t continue_if =
+    let rec build_revstring rl =
+      match get_char t with
+        | `Ch ch when (continue_if ch) -> (
+          build_revstring (ch::rl)
+          )
+        | `Ch ch -> (unget_char t ch; rl)
+        | _ -> rl
+    in
+    string_of_revlist (build_revstring initial_letters)
+
+(*f get_tag_depth
+input has a tag start character
+read tag characters
+return depth
+ *)
+let get_tag_depth t =
+  let rec add_tag_depth n =
+    match (get_char t) with
+    | `Ch ch when (Uchar.is_tag ch) -> add_tag_depth (n+1)
+    | l -> (
+      unget t l;
+      n
+    )
+  in
+  add_tag_depth 0
+
+(*f get_name
+input should have a name start character
+read name
+ *)
+let get_name t =
+  match (get_char t) with
+    | `Ch ch when (Uchar.is_name_start ch) -> (
+      ("",read_while ~initial_letters:[ch] t Uchar.is_name)
+                    )
+    | _ -> raise_error t `Malformed_char_stream
+
+(*f get_value
+pointing at start of string delimiter
+strings start with ' or " and end with the same " or '
+'characters' can be &<name>; and anything not < & and the end marker
+ *)
+let get_value t = 
+  match (get_char t) with
+  | `Ch ch when (Uchar.is_quote ch) -> (
+    read_until t (fun x->x==ch) Uchar.is_newline
+  )
+  | `Ch x -> (
+    unget_char t x;
+    read_while t (fun x->not (Uchar.is_whitespace x))
+  )
+  | _ -> raise_error t `Malformed_char_stream
+
+(*f get_attribute
+pointing at start of char
+ *)
+let get_attribute t : attribute = 
+  let name=get_name t in
+  match (get_char t) with
+  | `Ch ch when (Uchar.is_equal ch) -> (
+    let value=get_value t in
+    (name,value)
+  )
+  | _ -> raise_error t `Malformed_char_stream
+    
+(*f get_attributes
+skip whitespace
+peek - if next is attribute start then get attribute
+ *)
+let get_attributes t : attribute list = 
+    let rec build_revattributes rl =
+      skip_whitespace t;
+      match (peek_char t) with
+      | `Ch ch when (Uchar.is_name_start ch) -> (
+         let attr = get_attribute t in
+         build_revattributes (attr::rl)
+      )
+      | _ -> rl
+    in
+    let rl = build_revattributes [] in
+    List.rev rl
+
+(*f get_tag
+input has a tag start character
+read tag characters and get depth
+read tag name
+read attributes
+ *)
+let get_tag t =
+    let depth = get_tag_depth t in
+    let name = get_name t in
+    match (get_char t) with
+    | `Ch ch when (ch==125) -> ( (* } *)
+    `TagKet (depth, name)
+    )
+    | `Ch ch when (ch==123) -> ( (* { *)
+        skip_at_least_one_whitespace t;
+        let attributes = get_attributes t in
+        `TagOpen (true, depth, (name, attributes))
+    )
+    | l -> (
+        unget t l;
+        skip_at_least_one_whitespace t;
+        let attributes = get_attributes t in
+        `TagOpen (false, depth, (name, attributes))
+    )
+    
+(*f get_token
+skip whitespace
+if it is a tag then parse the tag and any attributes
+a tag starts with a tag character and finishes after last attribute
+
+Then next character must be EOF, tag_start, or quotation for cdata
+ *)
+let rec get_token t =
+  match t.pending_tag with
+  | Some (`TagKet (d,name)) -> ( (* pop top of tag stack *)
+    if (t.tag_depth==0) then (
+    t.tag_stack <- List.tl t.tag_stack; (* t.tag_stack should match name *)
+    t.tag_depth <- d;
+    `El_end
+    ) else (
+      t.tag_depth <- t.tag_depth - 1;
+      t.tag_stack <- List.tl t.tag_stack;
+      `El_end
+    )
+  )
+  | Some (`TagOpen (bra, d, _)) when (d<=t.tag_depth) -> ( (* pop top of tag stack *)
+    t.tag_depth <- t.tag_depth - 1;
+    t.tag_stack <- List.tl t.tag_stack;
+    `El_end
+  )
+  | Some (`TagOpen (bra, d, tag)) when (d==t.tag_depth+1) -> ( (* pending tag is at tag_depth+1 enter pending tag *)
+    if bra then (
+      t.tag_depth <- 0;
+      t.tag_stack <- tag :: t.tag_stack;
+      t.pending_tag <- None;
+      `El_start tag
+     ) else (
+      t.tag_depth <- t.tag_depth + 1;
+      t.tag_stack <- tag :: t.tag_stack;
+      t.pending_tag <- None;
+      `El_start tag
+    )
+  )
+  | Some _ -> ( (* invalid tag depth *)
+    raise_error t `Malformed_char_stream
+  )
+  | None -> (
+    skip_whitespace t;
+    match (get_char t) with
+    | `Ch ch when (Uchar.is_tag_start ch) -> (
+        (unget_char t ch) ;
+          t.pending_tag <- Some (get_tag t);
+          get_token t
+      )
+    | _ -> (
+      match t.tag_stack with
+      | hd :: tl -> (
+        t.tag_depth <- t.tag_depth - 1;
+        t.tag_stack <- List.tl t.tag_stack;
+        `El_end
+      )
+      | [] ->
+        raise_error t `Unexpected_eoi
+    )
+  )
+
+let make_input ?doc_tag:tag  source =
+    let reader = Reader.make source in
+    let tag_stack = match tag with | Some x -> [x] | None -> [] in
+    {reader; tag_stack; tag_depth=0; pending_tag=None}
+
+let input t =
+    get_token t
+
