@@ -45,12 +45,28 @@ module type LayoutElementType = sig
     type t    (* base element type *)
     type lt   (* layout of element type - does not include element *)
 
+    val styles       : (string * Stylesheet.Value.t_styleable_type * Stylesheet.Value.t_styleable_value * bool) list
     val get_min_bbox : t -> Primitives.t_rect
     val make_layout_within_bbox : t -> Primitives.t_rect -> lt
     val render_svg : t -> lt -> int -> Svg.t list
 end
+module LayoutElementBase = struct
+  let styles = Stylesheet.Value.[ ("padding",      St_float_4,  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
+                                  ("margin",       St_float_4,  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
+                                  ("border",       St_float_4,  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
+                                  ("anchor",       St_float_2,  Sv_floats (2,[|0.5;0.5;|]), false);
+                                  ("expand",       St_float_2,  Sv_floats (2,[|0.;0.;|]), false);
+                                  ("place",        St_float_2,  Sv_floats (2,[|0.;0.;|]), false);
+                                  ("grid",         St_int_4,    Sv_ints (4,[|0;0;0;0;|]), false);
+                                  ("rotation",     St_float,    Sv_float 0., false);
+                                  ("scale",        St_float_2,  Sv_floats (2,[|1.;1.;|]), false);
+                                  ("border_color", St_rgb,      Sv_rgb [|0.;0.;0.;|], true); (* inherit *)
+                                  ("face_color",   St_rgb,      Sv_rgb [|0.;0.;0.;|], true); (* inherit *)
+    ]
+end
 
 module PathInt : LayoutElementType = struct
+    include LayoutElementBase
     type t = int
     let r = Rectangle.mk_fixed (0.,0.,100.,20.)
     let get_min_bbox t = (0.,0.,100.,20.)
@@ -64,6 +80,7 @@ module TextInt : sig
     include LayoutElementType
     val make : Font.t -> float -> Color.t -> string list -> t
 end = struct 
+    include LayoutElementBase
     (* List of (?) text, font, style, base line, min font size, desired font size *)
     (* padding below lowest baseline, above upper baseline, to left of left-most pixel, to right of right-most pixel *)
     type t = {
@@ -74,6 +91,11 @@ end = struct
     (* anchor / alignment *)
       }
     type lt = Primitives.t_rect
+    let styles = Stylesheet.Value.[
+                   ("font_size",  St_float,  Sv_float 12., true);
+                   ("color",      St_rgb,    Sv_rgb [|0.;0.;0.;|], true);
+                 ] @ styles
+
     let r = Rectangle.mk_fixed (0.,0.,100.,20.)
     let get_min_bbox t = (0.,0.,100.,20.)
     let svg_use t lt = 
@@ -94,6 +116,7 @@ module BoxInt : sig
     include LayoutElementType
     val make : unit -> t
 end = struct 
+    include LayoutElementBase
     type t = int
 
     let get_min_bbox t = Rectangle.zeros
@@ -108,6 +131,7 @@ end
 module LayoutElementFunc (E:LayoutElementType) = struct
     type t  = E.t
     type lt = E.lt
+    let styles = E.styles
     let get_min_bbox = E.get_min_bbox
     let make_layout_within_bbox = E.make_layout_within_bbox
     let render_svg = E.render_svg
@@ -120,9 +144,10 @@ module Box  = LayoutElementFunc(BoxInt)
 module type LayoutElementAggrType = sig
     type et
     type lt
+    val styles       : (string * Stylesheet.Value.t_styleable_type * Stylesheet.Value.t_styleable_value * bool) list
     val get_min_bbox : et -> Primitives.t_rect
     val make_layout_within_bbox : et -> Primitives.t_rect -> lt
-    val render_svg : et -> lt -> int -> Svg.t list
+    val render_svg   : et -> lt -> int -> Svg.t list
 end
 
 module LayoutElement  = struct
@@ -134,6 +159,12 @@ module LayoutElement  = struct
   type lt = | LBox of  Box.lt
             | LText of Text.lt
             | LPath of Path.lt
+
+  let styles  = 
+    Text.styles @ Path.styles @ Box.styles
+
+(* let style_desc et  = Stylesheet.create_desc [] (styles et) *)
+
 
     let get_min_bbox et = 
       match et with
@@ -247,56 +278,22 @@ end
 
 module Element = struct
     include ElementFunc(LayoutElement)
+
+    let stylesheet = 
+      let stylesheet = Stylesheet.create () in
+      Stylesheet.add_style_defaults stylesheet LayoutElement.styles;
+      stylesheet
+
     (* These should include a stylesheet and style descriptor *)
     let make_text properties id text     = make_et properties id (LayoutElement.EText text) []
     let make_box  properties id elements = make_et properties id (LayoutElement.EBox (BoxInt.make ())) elements
-
 end
+
 (*a Toplevel *)
-let layout_styles = [ ("padding", Stylesheet.Styleable_value.St_float_4);
-                      ("margin",  Stylesheet.Styleable_value.St_float_4);
-                      ("border",  Stylesheet.Styleable_value.St_float_4);
-                      ("anchor",  Stylesheet.Styleable_value.St_float_2);
-                      ("expand",  Stylesheet.Styleable_value.St_float_2);
-                      ("place",   Stylesheet.Styleable_value.St_float_2);
-                      ("grid",    Stylesheet.Styleable_value.St_int_4);
-                      ("border_color", Stylesheet.Styleable_value.St_rgb );
-                      ("face_color",   Stylesheet.Styleable_value.St_rgb );
-                      ("rotation",   Stylesheet.Styleable_value.St_float);
-                      ("scale",      Stylesheet.Styleable_value.St_float_2);
-                    ]
-
-let element_text_styles = [
-                      ("font_size",  Stylesheet.Styleable_value.St_float );
-                      ("color",      Stylesheet.Styleable_value.St_rgb );
-                      ("rotation",   Stylesheet.Styleable_value.St_float);
-  ] @ layout_styles
-
-let element_text_style_desc  = Stylesheet.create_desc [] element_text_styles
 
 (*a Stylesheet things *)
-let create_stylesheet _ = 
-  let stylesheet = Stylesheet.create () in
-  Stylesheet.add_style_defaults stylesheet [("border",  Stylesheet.Styleable_value.Sv_floats (4,[|0.;0.;0.;0.;|]), false);
-                                            ("padding", Stylesheet.Styleable_value.Sv_floats (4,[|0.;0.;0.;0.;|]), false);
-                                            ("margin",  Stylesheet.Styleable_value.Sv_floats (4,[|0.;0.;0.;0.;|]), false);
-                                            ("dims",    Stylesheet.Styleable_value.Sv_floats (2,[|0.;0.;|]), false);
-                                            ("offset",  Stylesheet.Styleable_value.Sv_floats (2,[|0.;0.;|]), false);
-                                            ("align",   Stylesheet.Styleable_value.Sv_floats (2,[|0.;0.;|]), false);
-                                            ("faces",   Stylesheet.Styleable_value.Sv_ints (4,[|0;0;0;0;|]), false);
-                                            ("fill",    Stylesheet.Styleable_value.Sv_ints (2,[|0;0;|]), false);
-                                            ("width",   Stylesheet.Styleable_value.Sv_float 0., false);
-                                            ("height",   Stylesheet.Styleable_value.Sv_float 0., false);
-                                            ("face_color",   Stylesheet.Styleable_value.Sv_rgb [|0.;0.;0.;|], true); (* inherit *)
-                                            ("border_color", Stylesheet.Styleable_value.Sv_rgb [|0.;0.;0.;|], true); (* inherit *)
-                                            ("bg_color",     Stylesheet.Styleable_value.Sv_rgb [|0.;0.;0.;|], true); (* inherit *)
-                                            ("font_size",    Stylesheet.Styleable_value.Sv_float 1., true); (* inherit *)
-                                            ("font_height",    Stylesheet.Styleable_value.Sv_float 0., true); (* inherit *)
-                                            ("font_thickness", Stylesheet.Styleable_value.Sv_float 0., true); (* inherit *)
-                                            ("font_color",    Stylesheet.Styleable_value.Sv_rgb [|1.;1.;1.;|], true); (* inherit *)
-                                           ];
-    stylesheet
-let stylesheet = create_stylesheet ()
+(*
+let stylesheet = Element.create_stylesheet ()
 let sel_true            =  (fun e -> true)
 let sel_cbox            =  Stylesheet.se_is_element_id "control"
 let sel_type_button     =  Stylesheet.se_is_element_type "text_button"
@@ -321,3 +318,4 @@ let _ =
     ()
 
 
+ *)
