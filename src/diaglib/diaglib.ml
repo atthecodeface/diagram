@@ -195,7 +195,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
         bbox : Primitives.t_rect;
       }
 
-    (*f make_et - construct the hierarchy *)
+    (*f make_et - construct the hierarchy within a stylesheet *)
     let make_et properties id et content : et =
         let layout_properties = Layout.make_layout_hdr properties in
         let hdr = Primitives.th_make id in
@@ -247,7 +247,77 @@ end
 
 module Element = struct
     include ElementFunc(LayoutElement)
+    (* These should include a stylesheet and style descriptor *)
     let make_text properties id text     = make_et properties id (LayoutElement.EText text) []
     let make_box  properties id elements = make_et properties id (LayoutElement.EBox (BoxInt.make ())) elements
 
 end
+(*a Toplevel *)
+let layout_styles = [ ("padding", Stylesheet.Styleable_value.St_float_4);
+                      ("margin",  Stylesheet.Styleable_value.St_float_4);
+                      ("border",  Stylesheet.Styleable_value.St_float_4);
+                      ("anchor",  Stylesheet.Styleable_value.St_float_2);
+                      ("expand",  Stylesheet.Styleable_value.St_float_2);
+                      ("place",   Stylesheet.Styleable_value.St_float_2);
+                      ("grid",    Stylesheet.Styleable_value.St_int_4);
+                      ("border_color", Stylesheet.Styleable_value.St_rgb );
+                      ("face_color",   Stylesheet.Styleable_value.St_rgb );
+                      ("rotation",   Stylesheet.Styleable_value.St_float);
+                      ("scale",      Stylesheet.Styleable_value.St_float_2);
+                    ]
+
+let element_text_styles = [
+                      ("font_size",  Stylesheet.Styleable_value.St_float );
+                      ("color",      Stylesheet.Styleable_value.St_rgb );
+                      ("rotation",   Stylesheet.Styleable_value.St_float);
+  ] @ layout_styles
+
+let element_text_style_desc  = Stylesheet.create_desc [] element_text_styles
+
+(*a Stylesheet things *)
+let create_stylesheet _ = 
+  let stylesheet = Stylesheet.create () in
+  Stylesheet.add_style_defaults stylesheet [("border",  Stylesheet.Styleable_value.Sv_floats (4,[|0.;0.;0.;0.;|]), false);
+                                            ("padding", Stylesheet.Styleable_value.Sv_floats (4,[|0.;0.;0.;0.;|]), false);
+                                            ("margin",  Stylesheet.Styleable_value.Sv_floats (4,[|0.;0.;0.;0.;|]), false);
+                                            ("dims",    Stylesheet.Styleable_value.Sv_floats (2,[|0.;0.;|]), false);
+                                            ("offset",  Stylesheet.Styleable_value.Sv_floats (2,[|0.;0.;|]), false);
+                                            ("align",   Stylesheet.Styleable_value.Sv_floats (2,[|0.;0.;|]), false);
+                                            ("faces",   Stylesheet.Styleable_value.Sv_ints (4,[|0;0;0;0;|]), false);
+                                            ("fill",    Stylesheet.Styleable_value.Sv_ints (2,[|0;0;|]), false);
+                                            ("width",   Stylesheet.Styleable_value.Sv_float 0., false);
+                                            ("height",   Stylesheet.Styleable_value.Sv_float 0., false);
+                                            ("face_color",   Stylesheet.Styleable_value.Sv_rgb [|0.;0.;0.;|], true); (* inherit *)
+                                            ("border_color", Stylesheet.Styleable_value.Sv_rgb [|0.;0.;0.;|], true); (* inherit *)
+                                            ("bg_color",     Stylesheet.Styleable_value.Sv_rgb [|0.;0.;0.;|], true); (* inherit *)
+                                            ("font_size",    Stylesheet.Styleable_value.Sv_float 1., true); (* inherit *)
+                                            ("font_height",    Stylesheet.Styleable_value.Sv_float 0., true); (* inherit *)
+                                            ("font_thickness", Stylesheet.Styleable_value.Sv_float 0., true); (* inherit *)
+                                            ("font_color",    Stylesheet.Styleable_value.Sv_rgb [|1.;1.;1.;|], true); (* inherit *)
+                                           ];
+    stylesheet
+let stylesheet = create_stylesheet ()
+let sel_true            =  (fun e -> true)
+let sel_cbox            =  Stylesheet.se_is_element_id "control"
+let sel_type_button     =  Stylesheet.se_is_element_type "text_button"
+let sel_cls_rotate      =  Stylesheet.se_has_element_class "rotate"
+let sel_state_pressed   =  Stylesheet.se_is_element_state 0 3
+let sel_state_hover     =  Stylesheet.se_is_element_state 0 2
+let sel_state_enable    =  Stylesheet.se_is_element_state 0 1
+
+let sel_button_rotate = fun e -> (sel_type_button e) && (sel_cls_rotate e)
+let sel_hover_button  = fun e -> (sel_type_button e) && (sel_state_hover e)
+
+let _ = 
+    Stylesheet.add_style_rule stylesheet [sel_cbox; sel_hover_button]
+             [("border_color", Sv_rgb [|1.;1.;1.;|]);
+             ];
+    Stylesheet.add_style_rule stylesheet [sel_cbox; sel_type_button]
+             [("border", Sv_floats (6,[|1.;1.;1.;1.;1.;1.;|]));
+             ];
+    Stylesheet.add_style_rule stylesheet [sel_true]
+             [("margin", Sv_floats (6,[|0.;0.;0.;0.;0.;0.;|]));
+             ];
+    ()
+
+

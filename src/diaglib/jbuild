@@ -2,8 +2,9 @@
 
 (library (
   (name diaglib)
-  (public_name diaglib)
+  ;(public_name diaglib)
   (libraries (
+    stylesheet
     batteries
   ))
 ))
