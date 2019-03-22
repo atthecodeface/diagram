@@ -16,6 +16,13 @@
  * @brief   Styleable values
  *
  *)
+(*a To do
+Colors to come from strings - dictionary of string -> Sv_rgb color value
+Repr of value for reading back in - match Sv_rgb with color dictionary
+Value can be token list (e.g. for class)
+Value can be string
+ *)
+
 (*a Helper functions and modules *)
 (*f sfmt *)
 let sfmt = Printf.sprintf

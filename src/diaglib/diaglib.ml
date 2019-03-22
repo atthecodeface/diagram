@@ -225,7 +225,13 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
         bbox : Primitives.t_rect;
       }
 
-    (*f make_et - construct the hierarchy within a stylesheet *)
+    (*v Stylesheet *)
+    let stylesheet = 
+      let stylesheet = Stylesheet.create () in
+      Stylesheet.add_style_defaults stylesheet LayoutElement.styles;
+      stylesheet
+
+    (*f make_et - construct the hierarchy within the stylesheet *)
     let make_et properties id et content : et =
         let layout_properties = Layout.make_layout_hdr properties in
         let hdr = Primitives.th_make id in
@@ -278,12 +284,6 @@ end
 module Element = struct
     include ElementFunc(LayoutElement)
 
-    let stylesheet = 
-      let stylesheet = Stylesheet.create () in
-      Stylesheet.add_style_defaults stylesheet LayoutElement.styles;
-      stylesheet
-
-    (* These should include a stylesheet and style descriptor *)
     let make_text properties id text     = make_et properties id (LayoutElement.EText text) []
     let make_box  properties id elements = make_et properties id (LayoutElement.EBox (BoxInt.make ())) elements
 end
