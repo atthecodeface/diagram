@@ -26,7 +26,7 @@ let add_styling sid value opt (t:t_style) =
 let str (t:t_style) =
   let str_svo acc svo =
     let (sid,(svalue,opt)) = svo in
-    Printf.sprintf "%s%s:%s:%b\n" acc (Style_id.str sid) (Value.str_of_svalue svalue) opt
+    Printf.sprintf "%s%s:%s:%b\n" acc (Style_id.str sid) (Value.str svalue) opt
   in
   List.fold_left str_svo "style:\n" t.styles
 let get_value sid (t:t_style) =

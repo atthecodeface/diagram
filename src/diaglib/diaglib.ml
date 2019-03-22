@@ -51,17 +51,16 @@ module type LayoutElementType = sig
     val render_svg : t -> lt -> int -> Svg.t list
 end
 module LayoutElementBase = struct
-  let styles = Stylesheet.Value.[ ("padding",      St_float_4,  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
-                                  ("margin",       St_float_4,  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
-                                  ("border",       St_float_4,  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
-                                  ("anchor",       St_float_2,  Sv_floats (2,[|0.5;0.5;|]), false);
-                                  ("expand",       St_float_2,  Sv_floats (2,[|0.;0.;|]), false);
-                                  ("place",        St_float_2,  Sv_floats (2,[|0.;0.;|]), false);
-                                  ("grid",         St_int_4,    Sv_ints (4,[|0;0;0;0;|]), false);
-                                  ("rotation",     St_float,    Sv_float 0., false);
-                                  ("scale",        St_float_2,  Sv_floats (2,[|1.;1.;|]), false);
-                                  ("border_color", St_rgb,      Sv_rgb [|0.;0.;0.;|], true); (* inherit *)
-                                  ("face_color",   St_rgb,      Sv_rgb [|0.;0.;0.;|], true); (* inherit *)
+  let styles = Stylesheet.Value.[ ("padding",      (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
+                                  ("margin",       (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
+                                  ("border",       (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
+                                  ("anchor",       (St_floats 2),  Sv_floats (2,[|0.5;0.5;|]), false);
+                                  ("expand",       (St_floats 2),  Sv_floats (2,[|0.;0.;|]), false);
+                                  ("place",        (St_floats 2),  sv_none_floats, false);
+                                  ("grid",         (St_ints 4),    sv_none_ints, false);
+                                  ("rotation",     St_float,       sv_none_float, false);
+                                  ("scale",        (St_floats 2),  sv_none_floats, false);
+                                  ("border_color", St_rgb,         sv_none_rgb, true); (* inherit *)
     ]
 end
 
@@ -92,7 +91,7 @@ end = struct
       }
     type lt = Primitives.t_rect
     let styles = Stylesheet.Value.[
-                   ("font_size",  St_float,  Sv_float 12., true);
+                   ("font_size",  St_float,  Sv_float (Some 12.), true);
                    ("color",      St_rgb,    Sv_rgb [|0.;0.;0.;|], true);
                  ] @ styles
 
