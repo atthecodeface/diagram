@@ -131,9 +131,9 @@ type t_layout_properties = {
         padding        : Primitives.t_rect;
         border         : Primitives.t_rect;
         margin         : Primitives.t_rect;
-        place          : Primitives.t_vector; (* If placed this is where anchor * bbox is placed*)
+        place          : Primitives.t_vector option; (* If placed this is where anchor * bbox is placed*)
         anchor         : Primitives.t_vector; (* If placed, where in bbox the place point is; if grid, where in cell bbox to place bbox *)
-        grid           : Primitives.t_int4;   (* grid elements to cover w=1, h=1 are a single cell *)
+        grid           : Primitives.t_int4 option;   (* grid elements to cover w=1, h=1 are a single cell *)
         fill_color     : Primitives.Color.t;
         border_color   : Primitives.Color.t;
        (* 
@@ -147,16 +147,16 @@ expand - if grid and space available > min space then weight of expansion in x o
 (* should this have a mutable output bbox that is set when that is calculated ? *)
 }
 
-(*f make_layout_hdr properties - get actual data from the provided properties *)
-let make_layout_hdr properties =
-        let padding       = Properties.(get_property_rect properties Padding_ Rectangle.zeros) in
-        let border        = Properties.(get_property_rect properties Border_  Rectangle.zeros) in
-        let margin        = Properties.(get_property_rect properties Margin_  Rectangle.zeros) in
-        let place         = Properties.(get_property_vector properties Place_  (0.,0.)) in
-        let anchor        = Properties.(get_property_vector properties Anchor_  (0.,0.)) in
-        let grid          = Properties.(get_property_int4  properties Grid_  (0,0,0,0)) in
-        let fill_color    = Properties.(get_property_color properties FillColor_  Color.None) in
-        let border_color  = Properties.(get_property_color properties BorderColor_  Color.None) in
+(*f make_layout_hdr stylesheet styleable - get actual data from the provided properties *)
+let make_layout_hdr stylesheet styleable =
+        let padding       = Properties.(get_property_rect   stylesheet styleable "padding") in
+        let border        = Properties.(get_property_rect   stylesheet styleable "border") in
+        let margin        = Properties.(get_property_rect   stylesheet styleable "margin") in
+        let place         = Properties.(get_property_vector_option stylesheet styleable "place") in
+        let anchor        = Properties.(get_property_vector stylesheet styleable "anchor") in
+        let grid          = Properties.(get_property_int4_option   stylesheet styleable "grid") in
+        let fill_color    = Properties.(get_property_color  stylesheet styleable "fill_color") in
+        let border_color  = Properties.(get_property_color  stylesheet styleable "border_color") in
 (* content_transform and content_inv_transform *)
 {
  padding; border; margin; place; anchor; grid; fill_color; border_color;
@@ -164,8 +164,7 @@ let make_layout_hdr properties =
 
 (*f is_placed *)
 let is_placed t = 
-  let (_,_,cw,rw) = t.grid in
-  if ((cw<=0) || (rw<=0)) then true else false
+  match t.grid with | None -> true | _ -> false
 
 (*f expand_bbox - expand a bbox by the padding, border and margin *)
 let expand_bbox t bbox = Rectangle.(expand (expand (expand bbox t.padding) t.border) t.margin)
@@ -230,7 +229,7 @@ let make cp_bbox_list index =
   let f acc ((cp,bbox) : (t_layout_properties * Primitives.t_rect))  =
     if is_placed cp then (
       let (w, h) = Primitives.Rectangle.get_wh bbox in
-      let p = if (index==0) then (fst cp.place)  else (snd cp.place)  in
+      let p = match (cp.place,index) with | (None,_) -> 0. | (Some(x,y),0) -> x | (Some(x,y),_) -> y in
       let a = if (index==0) then (fst cp.anchor) else (snd cp.anchor) in
       let s = if (index==0) then w else h in
       let c0 = p -. a*.s in
@@ -263,7 +262,7 @@ let default_scale     = (1.,1.)
 let create props children_props_bbox =
   let build_grid_data acc ((cp,bbox) : (t_layout_properties * Primitives.t_rect))  =
     if (is_placed cp) then acc else (
-        let (cs,rs,cw,rw) = cp.grid in
+        let (cs,rs,cw,rw) = (match cp.grid with | None->(0,0,0,0) | Some x->x) in
         let (w, h) = Primitives.Rectangle.get_wh bbox in
         let (cl, rl) = acc in
         ((cs,cw,w)::cl), ((rs,rw,h)::rl)
@@ -313,7 +312,7 @@ let layout_within_bbox t bbox =
 
 let get_bbox_element t tr cp min_bbox = 
   if (is_placed cp) then min_bbox else (
-    let (cs,rs,cw,rw) = cp.grid in
+    let (cs,rs,cw,rw) = (match cp.grid with | None->(0,0,0,0) | Some x->x) in
     let (x0,x1) = GridDimension.get_bbox (List.hd t.grids) cs cw in
     let (y0,y1) = GridDimension.get_bbox (List.nth t.grids 1) rs rw in
     (x0,y0,x1,y1)

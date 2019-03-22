@@ -49,16 +49,16 @@ open Diaglib
  *)
 let main () =
     let page_bbox = (100.,100.,200.,150.) in
+    let stylesheet = Element.create_stylesheet () in
     let f = Font.make  "Arial embedded" 10. 3. 5. in
-    let t0 = Element.make_text [Grid (0,0,1,1);] "t0" (TextInt.make f 11. (Color.black) ["Some text"; ]) in
-    let t1 = Element.make_text [Grid (1,0,1,1);] "t1" (TextInt.make f 11. (Color.black) ["Some More text"; ]) in
-    let t2 = Element.make_text [Grid (0,1,2,1); Border (1.,1.,1.,1.); BorderColor Color.green; FillColor Color.red] "t2" (TextInt.make f 11. (Color.black) ["A long line of text"; ]) in
-    let b = Element.make_box Properties.[Border (5.,5.,5.,5.); BorderColor Color.blue;] "b0" [t0; t1; t2] in
-    let diag = Element.make_min_bbox b in
-    let diag = Element.make_layout_within_bbox diag page_bbox in
-    Element.show_layout diag "";
+    let t0 = Element.make_text [("grid","0,0,1,1");] "t0" (TextInt.make f ["Some text"; ]) in
+    let t1 = Element.make_text [("grid","1,0,1,1");] "t1" (TextInt.make f ["Some More text"; ]) in
+    let t2 = Element.make_text [("grid","0,1,2,1"); "border","1.,1.,1.,1."; "border_color","green"; "fill_color","red";] "t2" (TextInt.make f ["A long line of text"; ]) in
+    let b = Element.make_box ["border","5.,5.,5.,5."; "border_color","blue";] "b0" [t0; t1; t2] in
+    let lt = Element.layout_elements stylesheet page_bbox b in
+    Element.show_layout lt "";
     let oc = open_out "a.svg" in
-    let svg = Svg.svg_doc (Element.render_svg diag 0) page_bbox in
+    let svg = Svg.svg_doc (Element.render_svg lt 0) page_bbox in
     Svg.svg_print_hdr oc;
     Svg.pretty_print oc svg;
     close_out oc;

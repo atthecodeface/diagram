@@ -34,9 +34,9 @@ type t = | Padding      of Primitives.t_rect
          | BorderColor  of Color.t
          | BorderStroke of Stroke.t
          | Margin       of Primitives.t_rect
-         | Place        of Primitives.t_vector
+         | Place        of Primitives.t_vector option
          | Anchor       of Primitives.t_vector
-         | Grid         of Primitives.t_int4
+         | Grid         of Primitives.t_int4 option
 
 let property_num t = 
   match t with 
@@ -81,15 +81,32 @@ let replace_if_is_property_color t pn default =
 let get_property tl pn default : t = 
   List.fold_left (fun acc t -> replace_if_is_property t pn acc) default tl
 
-let get_property_vector tl pn default = 
-  List.fold_left (fun acc t -> replace_if_is_property_vector t pn acc) default tl
+let get_property_vector stylesheet styleable name =
+    let f = Stylesheet.styleable_value_as_floats stylesheet styleable name in
+    (f.(0), f.(1))
 
-let get_property_rect tl pn default = 
-  List.fold_left (fun acc t -> replace_if_is_property_rect t pn acc) default tl
+let get_property_vector_option stylesheet styleable name =
+  if Stylesheet.styleable_value_is_none stylesheet styleable name then None else (
+    let f = Stylesheet.styleable_value_as_floats stylesheet styleable name in
+    Some (f.(0), f.(1))
+  )
 
-let get_property_int4 tl pn default = 
-  List.fold_left (fun acc t -> replace_if_is_property_int4 t pn acc) default tl
+let get_property_rect stylesheet styleable name =
+    let f = Stylesheet.styleable_value_as_floats stylesheet styleable name in
+    (f.(0), f.(1), f.(2), f.(3))
 
-let get_property_color tl pn default = 
-  List.fold_left (fun acc t -> replace_if_is_property_color t pn acc) default tl
+let get_property_int4 stylesheet styleable name =
+    let f = Stylesheet.styleable_value_as_ints stylesheet styleable name in
+    (f.(0), f.(1), f.(2), f.(3))
 
+let get_property_int4_option stylesheet styleable name =
+  if Stylesheet.styleable_value_is_none stylesheet styleable name then None else (
+    let f = Stylesheet.styleable_value_as_ints stylesheet styleable name in
+    Some (f.(0), f.(1), f.(2), f.(3))
+  )
+
+let get_property_color stylesheet styleable name =
+  if Stylesheet.styleable_value_is_none stylesheet styleable name then Color.None else (
+    let f = Stylesheet.styleable_value_as_floats stylesheet styleable name in
+    Color.Rgb (f.(0), f.(1), f.(2))
+  )

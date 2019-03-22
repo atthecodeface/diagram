@@ -19,7 +19,6 @@
 
 (*a Inherit some from Value *)
 type t_styleable_value     = Value.t_styleable_value
-type t_styleable_value_ref = Value_ref.t
 type t_styleable_type      = Value.t_styleable_type
 type t_styleable_name      = Value.t_styleable_name
 
@@ -45,7 +44,7 @@ type t_style = {
 (*a Styleable descriptor types *)
 type t_styleable_desc = {
     state_descriptor : ( string * ((string * int) list)) list; (* each entry is a state_class -> (list of state_name of state_class->int) mappings *)
-    styles : (string * t_styleable_type) list; (* List of all stylenames the styleable cares about; usually a static list *)
+    styles : (string * t_styleable_type * t_styleable_value * bool) list; (* List of all stylenames the styleable cares about; usually a static list *)
   }
 
 type t_styleable_desc_built = {
@@ -65,7 +64,7 @@ type t_styleable= {
     id_name               : string;
     type_name             : string;
     classes               : string list;
-    values                : t_styleable_value_ref array; (* next_values.(i) corresponds to desc.sids.(i) *)
+    values                : Value_ref.t array; (* next_values.(i) corresponds to desc.sids.(i) *)
   }
 
 (*a Selectors and rules *)

@@ -29,7 +29,7 @@ module Styleable_desc_built = struct
   exception Style_type_mismatch of string
   let create desc ids =
     let fn acc n_t =
-      let (name,stype) = n_t in
+      let (name,stype,sv,i) = n_t in
       let opt_id = (Style_ids.find_opt_id (Style_id.hash_of_string name) ids) in
       match opt_id with
         None -> raise (Style_id_not_found_in_binding name)

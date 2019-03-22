@@ -110,6 +110,12 @@ let read_ints string num =
   fill_array ints num (max n 1) n 0
 
 
+(*f read_color *)
+let read_color string = 
+    match Color.from_name string with
+    | Some f -> f
+    | None -> read_floats string 3
+
 (*f string_is_none - return True if string is none *)
 let string_is_none string =
   match (Re.exec_opt string_is_none_rex string) with
@@ -205,7 +211,7 @@ let rec from_string stype value =
     match stype with
     | St_ints n   -> ( let ints   = read_ints   value n in Sv_ints (n,ints) )
     | St_floats n -> ( let floats = read_floats value n in Sv_floats (n,floats) )
-    | St_rgb      -> ( let floats = read_floats value 3 in Sv_rgb floats )
+    | St_rgb      -> Sv_rgb (read_color value)
     | St_int      -> ( let ints   = read_ints   value 1 in Sv_int (Some ints.(0)) )
     | St_float    -> ( let floats = read_floats value 1 in Sv_float (Some floats.(0)) )
   )
