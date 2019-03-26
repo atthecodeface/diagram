@@ -12,7 +12,7 @@ exception Error = Xmlm.Error
 type source = [
   | `Channel of in_channel | `String of int * string | `Fun of (unit -> int) ]
 
-type t_tagoc = [ | `TagOpen     of (bool * int * tag)  (* bra, depth, (name, attributes)  *)
+type t_tagoc = [ | `TagOpen     of (bool * int * tag * pos)  (* bra, depth, (name, attributes)  *)
                  | `TagKet      of (int * name) (* depth, name  *)
                ]
 
@@ -62,12 +62,27 @@ let read_while ?(initial_letters:int list=[]) t continue_if =
     in
     string_of_revlist (build_revstring initial_letters)
 
+let str_pt t =
+  match t.pending_tag with 
+  | None -> "None"
+  | Some `TagOpen (bra,depth,((ns,name),attrs), pos) ->
+     Printf.sprintf "Open %s:%2d:%s,%s" (if bra then "t" else "f") depth ns name
+  | Some `TagKet  (depth, (ns,name)) -> 
+     Printf.sprintf "Close  :%2d:%s,%s" depth ns name
+
+(*f verbose *)
+let verbose t r =
+  let (l,c) = Reader.pos t.reader in
+
+  Printf.printf ">>%3d,%3d:%40s:%2d:%2d:%40s:\n" l c r t.tag_depth (List.length t.tag_stack) (str_pt t)
+
 (*f get_tag_depth
 input has a tag start character
 read tag characters
 return depth
  *)
 let get_tag_depth t =
+  verbose t "get_tag_depth";
   let rec add_tag_depth n =
     match (get_char t) with
     | `Ch ch when (Uchar.is_tag ch) -> add_tag_depth (n+1)
@@ -83,6 +98,7 @@ input should have a name start character
 read name
  *)
 let get_name t =
+  verbose t "get_name";
   match (get_char t) with
     | `Ch ch when (Uchar.is_name_start ch) -> (
       ("",read_while ~initial_letters:[ch] t Uchar.is_name)
@@ -95,6 +111,7 @@ strings start with ' or " and end with the same " or '
 'characters' can be &<name>; and anything not < & and the end marker
  *)
 let get_value t = 
+  verbose t "get_value";
   match (get_char t) with
   | `Ch ch when (Uchar.is_quote ch) -> (
     read_until t (fun x->x==ch) Uchar.is_newline
@@ -109,6 +126,7 @@ let get_value t =
 pointing at start of char
  *)
 let get_attribute t : attribute = 
+  verbose t "get_attribute";
   let name=get_name t in
   match (get_char t) with
   | `Ch ch when (Uchar.is_equal ch) -> (
@@ -122,17 +140,18 @@ skip whitespace
 peek - if next is attribute start then get attribute
  *)
 let get_attributes t : attribute list = 
-    let rec build_revattributes rl =
-      skip_whitespace t;
-      match (peek_char t) with
-      | `Ch ch when (Uchar.is_name_start ch) -> (
-         let attr = get_attribute t in
-         build_revattributes (attr::rl)
-      )
-      | _ -> rl
-    in
-    let rl = build_revattributes [] in
-    List.rev rl
+  verbose t "get_attributes";
+  let rec build_revattributes rl =
+    skip_whitespace t;
+    match (peek_char t) with
+    | `Ch ch when (Uchar.is_name_start ch) -> (
+      let attr = get_attribute t in
+      build_revattributes (attr::rl)
+    )
+    | _ -> rl
+  in
+  let rl = build_revattributes [] in
+  List.rev rl
 
 (*f get_tag
 input has a tag start character
@@ -141,23 +160,25 @@ read tag name
 read attributes
  *)
 let get_tag t =
-    let depth = get_tag_depth t in
-    let name = get_name t in
-    match (get_char t) with
-    | `Ch ch when (ch==125) -> ( (* } *)
+  verbose t "get_tag";
+  let pos = Reader.pos t.reader in
+  let depth = get_tag_depth t in
+  let name = get_name t in
+  match (get_char t) with
+  | `Ch ch when (ch==125) -> ( (* } *)
     `TagKet (depth, name)
-    )
-    | `Ch ch when (ch==123) -> ( (* { *)
-        skip_at_least_one_whitespace t;
-        let attributes = get_attributes t in
-        `TagOpen (true, depth, (name, attributes))
-    )
-    | l -> (
-        unget t l;
-        skip_at_least_one_whitespace t;
-        let attributes = get_attributes t in
-        `TagOpen (false, depth, (name, attributes))
-    )
+  )
+  | `Ch ch when (ch==123) -> ( (* { *)
+    skip_at_least_one_whitespace t;
+    let attributes = get_attributes t in
+    `TagOpen (true, depth, (name, attributes), pos)
+  )
+  | l -> (
+    unget t l;
+    skip_at_least_one_whitespace t;
+    let attributes = get_attributes t in
+    `TagOpen (false, depth, (name, attributes), pos)
+  )
     
 (*f get_token
 skip whitespace
@@ -167,6 +188,7 @@ a tag starts with a tag character and finishes after last attribute
 Then next character must be EOF, tag_start, or quotation for cdata
  *)
 let rec get_token t =
+  verbose t "get_token";
   match t.pending_tag with
   | Some (`TagKet (d,name)) -> ( (* pop top of tag stack *)
     if (t.tag_depth==0) then (
@@ -179,12 +201,13 @@ let rec get_token t =
       `El_end
     )
   )
-  | Some (`TagOpen (bra, d, _)) when (d<=t.tag_depth) -> ( (* pop top of tag stack *)
+  | Some (`TagOpen (bra, d, _, _)) when (d<=t.tag_depth) -> ( (* pop top of tag stack *)
+  verbose t "get_token2";
     t.tag_depth <- t.tag_depth - 1;
     t.tag_stack <- List.tl t.tag_stack;
     `El_end
   )
-  | Some (`TagOpen (bra, d, tag)) when (d==t.tag_depth+1) -> ( (* pending tag is at tag_depth+1 enter pending tag *)
+  | Some (`TagOpen (bra, d, tag, _)) when (d==t.tag_depth+1) -> ( (* pending tag is at tag_depth+1 enter pending tag *)
     if bra then (
       t.tag_depth <- 0;
       t.tag_stack <- tag :: t.tag_stack;
@@ -197,7 +220,10 @@ let rec get_token t =
       `El_start tag
     )
   )
-  | Some _ -> ( (* invalid tag depth *)
+  | Some (`TagOpen (_, _, tag, (l,c))) -> ( (* invalid tag depth *)
+    Printf.printf "Start of tag for error (%d,%d)\n" l c;
+    Printf.printf "Pending tag %s\n" (str_pt t);
+    Printf.printf "Tag depth %d\n" t.tag_depth;
     raise_error t `Malformed_char_stream
   )
   | None -> (
