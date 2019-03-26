@@ -23,7 +23,49 @@ module Rectangle = Primitives.Rectangle
 module Layout = Layout
 module Svg = Svg
 
-(*a Modules *)
+(*a Base layout element modules *)
+(*m LayoutElementType *)
+module type LayoutElementType = sig
+    type et   (* base element type *)
+    type rt   (* resolved styled of element type - does not include t *)
+    type lt   (* layout of element type - does not include rt or t *)
+
+    val styles       : (string * Stylesheet.Value.t_styleable_type * Stylesheet.Value.t_styleable_value * bool) list
+    val resolve_styles : et -> Stylesheet.t_stylesheet -> Stylesheet.t_styleable -> rt
+    val get_min_bbox : et -> rt -> Primitives.t_rect
+    val make_layout_within_bbox : et -> rt -> Primitives.t_rect -> lt
+    val render_svg   : et -> rt -> lt -> int -> Svg.t list
+end
+
+(*m LayoutElementFunc *)
+module LayoutElementFunc (E:LayoutElementType) = struct
+    type et = E.et
+    type rt = E.rt
+    type lt = E.lt
+    let styles = E.styles
+    let resolve_styles = E.resolve_styles
+    let get_min_bbox = E.get_min_bbox
+    let make_layout_within_bbox = E.make_layout_within_bbox
+    let render_svg = E.render_svg
+end
+
+(*m LayoutElementBase *)
+module LayoutElementBase = struct
+  let styles = Stylesheet.Value.[ ("padding",      (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
+                                  ("margin",       (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
+                                  ("border",       (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
+                                  ("anchor",       (St_floats 2),  Sv_floats (2,[|0.5;0.5;|]), false);
+                                  ("expand",       (St_floats 2),  Sv_floats (2,[|0.;0.;|]), false);
+                                  ("place",        (St_floats 2),  sv_none_floats, false);
+                                  ("grid",         (St_ints 4),    sv_none_ints, false);
+                                  ("rotation",     St_float,       sv_none_float, false);
+                                  ("scale",        (St_floats 2),  sv_none_floats, false);
+                                  ("border_color", St_rgb,         sv_none_rgb, true); (* inherit *)
+                                  ("fill_color",   St_rgb,         sv_none_rgb, true); (* inherit *)
+    ]
+end
+
+(*a Base layout element modules *)
 (*m LayoutElementAggrType *)
 module type LayoutElementAggrType = sig
     type et
@@ -169,45 +211,4 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
 
 end
 
-
-(*m LayoutElementType *)
-module type LayoutElementType = sig
-    type et   (* base element type *)
-    type rt   (* resolved styled of element type - does not include t *)
-    type lt   (* layout of element type - does not include rt or t *)
-
-    val styles       : (string * Stylesheet.Value.t_styleable_type * Stylesheet.Value.t_styleable_value * bool) list
-    val resolve_styles : et -> Stylesheet.t_stylesheet -> Stylesheet.t_styleable -> rt
-    val get_min_bbox : et -> rt -> Primitives.t_rect
-    val make_layout_within_bbox : et -> rt -> Primitives.t_rect -> lt
-    val render_svg   : et -> rt -> lt -> int -> Svg.t list
-end
-
-(*m LayoutElementFunc *)
-module LayoutElementFunc (E:LayoutElementType) = struct
-    type et = E.et
-    type rt = E.rt
-    type lt = E.lt
-    let styles = E.styles
-    let resolve_styles = E.resolve_styles
-    let get_min_bbox = E.get_min_bbox
-    let make_layout_within_bbox = E.make_layout_within_bbox
-    let render_svg = E.render_svg
-end
-
-(*m LayoutElementBase *)
-module LayoutElementBase = struct
-  let styles = Stylesheet.Value.[ ("padding",      (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
-                                  ("margin",       (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
-                                  ("border",       (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
-                                  ("anchor",       (St_floats 2),  Sv_floats (2,[|0.5;0.5;|]), false);
-                                  ("expand",       (St_floats 2),  Sv_floats (2,[|0.;0.;|]), false);
-                                  ("place",        (St_floats 2),  sv_none_floats, false);
-                                  ("grid",         (St_ints 4),    sv_none_ints, false);
-                                  ("rotation",     St_float,       sv_none_float, false);
-                                  ("scale",        (St_floats 2),  sv_none_floats, false);
-                                  ("border_color", St_rgb,         sv_none_rgb, true); (* inherit *)
-                                  ("fill_color",   St_rgb,         sv_none_rgb, true); (* inherit *)
-    ]
-end
 
