@@ -16,13 +16,6 @@
  * @brief   Styleable values
  *
  *)
-(*a To do
-Colors to come from strings - dictionary of string -> Sv_rgb color value
-Repr of value for reading back in - match Sv_rgb with color dictionary
-Value can be token list (e.g. for class)
-Value can be string
- *)
-
 (*a Helper functions and modules *)
 (*f sfmt *)
 let sfmt = Printf.sprintf
@@ -122,6 +115,32 @@ let string_is_none string =
   | None -> true
   | _ -> false
 
+(*f read_tokens *)
+let read_tokens string =
+  let n = String.length string in
+  let rec read_next_token rtl i t nt =
+    if (i>=n) then (rtl, t, nt) else (
+      let ch = String.get string i in
+      if (ch==' ') then (
+        if nt then (
+          read_next_token rtl (i+1) t nt
+        ) else (
+          read_next_token (t::rtl) (i+1) "" true
+        )
+      ) else (
+        let s = String.make 1 ch in
+        if nt then (
+          read_next_token rtl (i+1) s false
+        ) else (
+          read_next_token rtl (i+1) (t^s) false
+        )
+      )
+    )
+  in
+  let (rtl, last_token, no_last_token) = read_next_token [] 0 "" true in
+  let rtl = if no_last_token then rtl else last_token::rtl in
+  List.rev rtl
+
 (*a Types *)
 (*e Exception Bad_value*)
 exception Bad_value of string
@@ -131,14 +150,16 @@ type t_styleable_name = string
 
 (*t t_styleable_value *)
 type t_styleable_value =
-  Sv_floats of int * (float array)
-| Sv_float  of float option
-| Sv_int    of int option
-| Sv_ints   of int * (int array)
-| Sv_rgb    of float array
+  | Sv_floats     of int * (float array)
+  | Sv_float      of float option
+  | Sv_int        of int option
+  | Sv_ints       of int * (int array)
+  | Sv_rgb        of float array
+  | Sv_string     of string option
+  | Sv_token_list of string list
 
 (*t t_styleable_type *)
-type t_styleable_type = St_floats of int | St_ints of int | St_float | St_int | St_rgb
+type t_styleable_type = St_floats of int | St_ints of int | St_float | St_int | St_rgb | St_string | St_token_list
 
 (*a Styleable_value module *)
 (*v sv_zero, sv_none_ints, sv_none_floats - for use as defaults *)
@@ -150,6 +171,8 @@ let sv_none_ints   = Sv_ints (0, none_ints)
 let sv_none_float  = Sv_float None
 let sv_none_int    = Sv_int None
 let sv_none_rgb    = Sv_rgb none_floats
+let sv_none_string = Sv_string None
+let sv_none_token_list = Sv_token_list []
 
 (*v one_i_0, one_f_0 - useful float arrays as defaults *)
 let one_i_0 = [|0;|]
@@ -158,20 +181,24 @@ let one_f_0 = [|0.;|]
 (*f stype - find type of an svalue *)
 let stype v = 
   match v with
-    Sv_float _ -> St_float
-  | Sv_floats (n,_) -> St_floats n
-  | Sv_ints   (n,_) -> St_ints n
-  | Sv_int _ -> St_int
-  | Sv_rgb _ -> St_rgb
+  | Sv_float _        -> St_float
+  | Sv_floats (n,_)   -> St_floats n
+  | Sv_ints   (n,_)   -> St_ints n
+  | Sv_int _          -> St_int
+  | Sv_rgb _          -> St_rgb
+  | Sv_string _       -> St_string
+  | Sv_token_list _   -> St_token_list
 
 (*f is_none - return True if is none *)
 let is_none v =
   match v with
-  | Sv_float None                              -> true
-  | Sv_int None                                -> true
+  | Sv_float None                           -> true
+  | Sv_int None                             -> true
   | Sv_floats (_,f)   when (f==none_floats) -> true
   | Sv_rgb f          when (f==none_floats) -> true
   | Sv_ints (_,f)     when (f==none_ints)   -> true
+  | Sv_string None                          -> true
+  | Sv_token_list []                        -> true
   | _ -> false
 
 (*f is_some - return True if is not none *)
@@ -183,10 +210,11 @@ let str v =
     match v with
     | Sv_float None       -> sfmt "flt:<None>"
     | Sv_int None         -> sfmt "flt:<None>"
-    | Sv_float (Some f)   -> sfmt "flt:%f" f
     | Sv_floats (n,_)     -> sfmt "f%d:<None>" n
     | Sv_ints   (n,_)     -> sfmt "i%d:<None>" n
     | Sv_rgb _            -> sfmt "rgb:<None>"
+    | Sv_string None      -> sfmt "str:<None>"
+    | Sv_token_list []    -> sfmt "tkn:<None>" 
     | _ -> ""
   ) else (
     match v with
@@ -195,25 +223,41 @@ let str v =
     | Sv_floats (n,f)     -> sfmt "f%d:%s" n (String.concat " " (List.map (sfmt "%f") (Array.to_list f)))
     | Sv_ints   (n,i)     -> sfmt "i%d:%s" n (String.concat " " (List.map (sfmt "%d") (Array.to_list i)))
     | Sv_rgb f            -> sfmt "rgb:%f %f %f" f.(0) f.(1) f.(2)
+    | Sv_string (Some s)  -> sfmt "str:'%s'" s
+    | Sv_token_list l     -> sfmt "tkn:[%s]" (List.fold_left (fun acc s -> (sfmt "%s %s" acc s)) "" l)
     | _ -> ""
+  )
+
+(*f get_name *)
+let get_name v =
+  if (is_none v) then  (
+    None 
+  ) else (
+    match v with
+    | Sv_rgb f -> Color.name f
+    | _ -> None
   )
 
 (*f from_string *)
 let rec from_string stype value =
   if (string_is_none value) then (
     match stype with
-    | St_ints n   -> Sv_ints   (n,none_ints)
-    | St_floats n -> Sv_floats (n,none_floats)
-    | St_rgb      -> Sv_rgb    none_floats
-    | St_int      -> Sv_int None
-    | St_float    -> Sv_float None
+    | St_ints n     -> sv_none_ints
+    | St_floats n   -> sv_none_floats
+    | St_rgb        -> sv_none_rgb
+    | St_int        -> sv_none_int
+    | St_float      -> sv_none_float
+    | St_string     -> sv_none_string
+    | St_token_list -> sv_none_token_list
   ) else (
     match stype with
-    | St_ints n   -> ( let ints   = read_ints   value n in Sv_ints (n,ints) )
-    | St_floats n -> ( let floats = read_floats value n in Sv_floats (n,floats) )
-    | St_rgb      -> Sv_rgb (read_color value)
-    | St_int      -> ( let ints   = read_ints   value 1 in Sv_int (Some ints.(0)) )
-    | St_float    -> ( let floats = read_floats value 1 in Sv_float (Some floats.(0)) )
+    | St_ints n     -> ( let ints   = read_ints   value n in Sv_ints (n,ints) )
+    | St_floats n   -> ( let floats = read_floats value n in Sv_floats (n,floats) )
+    | St_rgb        -> Sv_rgb (read_color value)
+    | St_int        -> ( let ints   = read_ints   value 1 in Sv_int (Some ints.(0)) )
+    | St_float      -> ( let floats = read_floats value 1 in Sv_float (Some floats.(0)) )
+    | St_string     -> Sv_string (Some value)
+    | St_token_list -> ( let tokens = read_tokens value in Sv_token_list tokens)
   )
 
 (*f as_floats - get a float array of an svalue *)
@@ -250,4 +294,27 @@ let as_ints ?default svalue =
   | Sv_ints    (_,i) -> i
   | _ -> one_i_0
   )
+
+(*f as_string - get a string an svalue *)
+let as_string ?default svalue =
+  if (is_none svalue) then (
+    match default with | Some f -> f | None -> raise (Bad_value "No default value provided when getting value as_ints")
+  ) else (
+  match svalue with
+  | Sv_string (Some s) -> s
+  | Sv_token_list l -> String.concat " " l
+  | _ -> str svalue
+  )
+
+(*f has_token - check if it has a token - only for St_token_list really *)
+let has_token svalue str =
+  match svalue with
+  | Sv_token_list l -> List.fold_left (fun acc s -> if acc then true else (String.equal s str)) false l
+  | _ -> false
+
+(*f equals_string - check if it equals a string - only for St_string really *)
+let equals_string svalue str =
+  match svalue with
+  | Sv_string (Some s) -> String.equal s str
+  | _ -> false
 
