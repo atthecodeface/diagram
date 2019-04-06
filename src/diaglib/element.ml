@@ -235,6 +235,9 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       { th=etb.th; lt; reval=etb.reval; layout=etb.layout; ltr; content_lt; bbox;}
 
     (*f finalize geometry *)
+    let finalize_geometry lt =
+      lt
+
     (*f get geometry field (float along line?) *)
     (*f show_layout *)
     let rec show_layout lt indent =
@@ -255,13 +258,14 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     Printf.printf "\n";
 
         let lt  = make_layout_within_bbox etb page_bbox in
-        lt
+        let gt  = finalize_geometry lt in
+        gt
 
-    (*f render_svg lt index - return a list of SVG tags that make up the element *)
-    let rec render_svg lt zindex =
-      let content_svg   = List.fold_left (fun a x -> a @ (render_svg x zindex)) [] lt.content_lt in
-      let element_svg   = LE.render_svg lt.lt zindex in
-      Layout.render_svg lt.layout lt.ltr (content_svg @ element_svg) 
+    (*f render_svg gt index - return a list of SVG tags that make up the element *)
+    let rec render_svg gt zindex =
+      let content_svg   = List.fold_left (fun a x -> a @ (render_svg x zindex)) [] gt.content_lt in
+      let element_svg   = LE.render_svg gt.lt zindex in
+      Layout.render_svg gt.layout gt.ltr (content_svg @ element_svg) 
 
     (*f All done *)
 
