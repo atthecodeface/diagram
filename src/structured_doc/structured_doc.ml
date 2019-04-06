@@ -6,8 +6,8 @@ type attribute = Xmlm.attribute
 type tag       = Xmlm.tag
 type signal    = Xmlm.signal
 
-let ns_xml   = "xml"
-let ns_xmlns = "xmlns"
+let ns_xml   = Xmlm.ns_xml
+let ns_xmlns = Xmlm.ns_xmlns
 
 let name_string (ns,n) =
     if (String.length ns)==0 then n else Printf.sprintf "%s:%s" ns n

@@ -55,6 +55,9 @@
   (*f value_is_some t - determine if value is not none *)
   let value_is_some t =  Value.is_some t.value
 
+  (*f get_value_as_color_string t - get the value as an array of floats *)
+  let get_value_as_color_string ?default t =  Value.as_color_string ?default:default t.value
+
   (*f get_value_as_floats t - get the value as an array of floats *)
   let get_value_as_floats ?default t =  Value.as_floats ?default:default t.value
 

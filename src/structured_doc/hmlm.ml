@@ -5,13 +5,8 @@ type tag       = Xmlm.tag
 type signal    = Xmlm.signal
 type pos       = Xmlm.pos
 
-  type encoding = [
-    | `UTF_8 | `UTF_16 | `UTF_16BE | `UTF_16LE | `ISO_8859_1| `US_ASCII ]
-  type error = Xmlm.error
+type error = Xmlm.error
 exception Error = Xmlm.Error
-type source = [
-  | `Channel of in_channel | `String of int * string | `Fun of (unit -> int) ]
-
 type t_tagoc = [ | `TagOpen     of (bool * int * tag * pos)  (* bra, depth, (name, attributes)  *)
                  | `TagKet      of (int * name) (* depth, name  *)
                ]
@@ -73,8 +68,8 @@ let str_pt t =
 (*f verbose *)
 let verbose t r =
   let (l,c) = Reader.pos t.reader in
-
   Printf.printf ">>%3d,%3d:%40s:%2d:%2d:%40s:\n" l c r t.tag_depth (List.length t.tag_stack) (str_pt t)
+let verbose _ _ = ()
 
 (*f get_tag_depth
 input has a tag start character
@@ -229,11 +224,18 @@ let rec get_token t =
   | None -> (
     skip_whitespace t;
     match (get_char t) with
+    | `Ch ch when (Uchar.is_comment_start ch) -> (
+      ignore (read_until t Uchar.is_newline (fun x->false));
+      get_token t
+    )
     | `Ch ch when (Uchar.is_tag_start ch) -> (
-        (unget_char t ch) ;
-          t.pending_tag <- Some (get_tag t);
-          get_token t
-      )
+      (unget_char t ch) ;
+      t.pending_tag <- Some (get_tag t);
+      get_token t
+    )
+    | `Ch ch -> (
+       raise_error t `Malformed_char_stream
+    )
     | _ -> (
       match t.tag_stack with
       | hd :: tl -> (
@@ -242,7 +244,7 @@ let rec get_token t =
         `El_end
       )
       | [] ->
-        raise_error t `Unexpected_eoi
+         raise_error t `Unexpected_eoi
     )
   )
 

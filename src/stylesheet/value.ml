@@ -228,8 +228,8 @@ let str v =
     | _ -> ""
   )
 
-(*f get_name *)
-let get_name v =
+(*f get_color_name *)
+let get_color_name v =
   if (is_none v) then  (
     None 
   ) else (
@@ -258,6 +258,20 @@ let rec from_string stype value =
     | St_float      -> ( let floats = read_floats value 1 in Sv_float (Some floats.(0)) )
     | St_string     -> Sv_string (Some value)
     | St_token_list -> ( let tokens = read_tokens value in Sv_token_list tokens)
+  )
+
+(*f as_color_string - get a color as a string of an svalue *)
+let as_color_string ?default svalue =
+  match get_color_name svalue with
+  | Some s -> s
+  | None -> (
+    if (is_none svalue) then (
+      match default with | Some f -> f | None -> raise (Bad_value "No default value provided when getting value as_floats")
+    ) else (
+      match svalue with
+      | Sv_rgb     f    -> sfmt "%f %f %f" f.(0) f.(1) f.(2)
+      | _               -> "''"
+    )
   )
 
 (*f as_floats - get a float array of an svalue *)

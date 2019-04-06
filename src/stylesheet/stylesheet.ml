@@ -154,6 +154,7 @@ let se_is_element_type     = Styleable.is_element_type
 let se_has_element_class   = Styleable.has_element_class
 
 let styleable_value_is_none stylesheet styleable name = Value_ref.value_is_none (Styleable.get_value_ref styleable stylesheet name)
+let styleable_value_as_color_string ?default stylesheet styleable name = Value_ref.get_value_as_color_string ?default:default (Styleable.get_value_ref styleable stylesheet name)
 let styleable_value_as_floats ?default stylesheet styleable name = Value_ref.get_value_as_floats ?default:default (Styleable.get_value_ref styleable stylesheet name)
 let styleable_value_as_float ?default stylesheet styleable name = Value_ref.get_value_as_float ?default:default (Styleable.get_value_ref styleable stylesheet name)
 let styleable_value_as_ints ?default stylesheet styleable name = Value_ref.get_value_as_ints ?default:default (Styleable.get_value_ref styleable stylesheet name)

@@ -17,10 +17,10 @@ let get_char_from_source t =
     (let ch = `Ch (Char.code (String.get s (n+t.i))) in
     t.i<-t.i+1;
     ch))
-  | `Fun f        -> `Ch_eof (* ( let ch = f () in () ) *)
+  | `Fun f        -> try (`Ch (f ())) with | End_of_file -> `Ch_eof
 
 let make source = 
-    let t = {source; i=0; in_hand=`Ch 0; has_been_given=true; line=1; char=0;} in
+    let t = {source; i=0; in_hand=`Ch 0; has_been_given=false; line=1; char=0;} in
     t.in_hand <- get_char_from_source t;
     t
 

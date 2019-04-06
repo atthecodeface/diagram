@@ -78,32 +78,37 @@ end = struct
         text : string list; (* One string per line *)
       }
     type rt = {
-        size : float;
-        color : float array;
+        size  : float;
+        color : string;
     (* anchor / alignment *)
       }
-    type lt = Primitives.t_rect
+    type lt = Primitives.t_rect (* Rectangle to place text within *)
+
     let styles = Stylesheet.Value.[
                    ("font_size",  St_float,  Sv_float (Some 12.), true);
                    ("font_color", St_rgb,    Sv_rgb [|0.;0.;0.;|], true);
                  ] @ styles
 
+    let make font text = {font; text}
+
     let resolve_styles et stylesheet styleable : rt =
       let size  = Stylesheet.styleable_value_as_float stylesheet styleable "font_size" in
-      let color = Stylesheet.styleable_value_as_floats stylesheet styleable "font_color" in
+      let color = Stylesheet.styleable_value_as_color_string stylesheet styleable "font_color" in
       {size; color}
 
     let r = Rectangle.mk_fixed (0.,0.,100.,20.)
     let get_min_bbox et rt = (0.,0.,100.,20.)
+    let make_layout_within_bbox et rt bbox = 
+      Printf.printf "\nText layout bbox %s\n\n" (Rectangle.str bbox);
+      bbox
     let svg_use et rt lt = 
-      let (_,_,_,y) = lt in
-      Svg.(tag "text" [(*StringAttr ("class", "TextShape");*)
-                                     FloatAttr ("x", 0.);
-                                     FloatAttr ("y", y);
- (*       (Color.svg_attr "fill" et.color);*)
+      let (x0,y0,x1,y1) = lt in
+      Svg.(tag "text" [(* font-family, stroke *)
+                                     FloatAttr ("x", x0);
+                                     FloatAttr ("y", y1);
+                                     FloatAttr ("font-size", rt.size);
+                                     StringAttr ("fill", rt.color);
                     ] [] et.text)
-    let make font text = {font; text}
-    let make_layout_within_bbox et rt bbox = bbox
     let render_svg et rt lt i = 
       let svg = svg_use et rt lt in
       [svg]
@@ -161,11 +166,27 @@ module DiagramElement = struct
   let et_is_path = function | EPath _ -> true | _ -> false
   let et_is_box  = function | EBox  _ -> true | _ -> false
 
-  let type_name et = 
+  let type_name_et et = 
     match et with
     | EText e      -> "text"
     | EPath e      -> "path"
     | EBox  e      -> "box"
+
+  let et_of_rt rt =
+    match rt with
+    | RText (e,r) -> EText e
+    | RPath (e,r) -> EPath e
+    | RBox  (e,r) -> EBox e
+
+  let et_of_lt lt =
+    match lt with
+    | LText (e,r,l) -> EText e
+    | LPath (e,r,l) -> EPath e
+    | LBox  (e,r,l) -> EBox e
+
+  let type_name_rt rt = type_name_et (et_of_rt rt)
+
+  let type_name_lt lt = type_name_et (et_of_lt lt)
 
   let resolve_styles et stylesheet styleable =
     match et with
@@ -229,3 +250,57 @@ let _ =
 
 
  *)
+
+(*a HML stuff *)
+exception Bad_tag of string
+open Structured_doc
+
+let from_structured_doc f =
+  let fnt = Font.make  "Arial embedded" 10. 3. 5. in
+  let rec read_element_contents opt_nsn_att rev_acc t =
+    match (input t) with
+    | `El_start ((ns,name),attrs) -> (
+      let e = read_element_contents (Some ((ns,name),attrs)) [] t in
+      read_element_contents opt_nsn_att (e::rev_acc) t
+    )
+    | `El_end -> (
+      let contents = List.rev rev_acc in
+      let e = (
+          match opt_nsn_att with 
+          | None -> Element.make_box [] "toplevel" contents
+          | Some ((ns,name),attrs) ->  (
+             let attrs = List.map (fun ((ns,name),value) -> (name,value)) attrs in
+             if (String.equal name "box") then (
+               Element.make_box attrs "b0" contents
+             ) else if (String.equal name "text") then (
+               Element.make_text attrs "t0" (TextInt.make fnt ["Some text"; ])
+             ) else (
+               raise (Bad_tag name)
+             )
+          )
+        ) in
+         e
+    )
+    | `Data _ -> (
+      read_element_contents opt_nsn_att rev_acc t
+    )
+    | `Dtd _ -> (
+      read_element_contents opt_nsn_att rev_acc t
+    )
+  in
+
+  let hml = make_hmlm (Hmlm.make_input ~doc_tag:(("","diag"),[]) f) in
+  let diag = (
+      try (read_element_contents None [] hml)
+      with 
+      | Xmlm.Error ((l,c),e) -> (
+        Printf.printf "Error %s at line %d char %d \n" (Xmlm.error_message e) l c;
+        raise Not_found
+      )
+      | Bad_tag x -> (
+         Printf.printf "Bad tag %s \n" x;
+         raise Not_found
+      )
+    ) in
+    diag
+

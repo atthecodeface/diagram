@@ -51,7 +51,8 @@ end
 
 (*m LayoutElementBase *)
 module LayoutElementBase = struct
-  let styles = Stylesheet.Value.[ ("padding",      (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
+  let styles = Stylesheet.Value.[ ("class",        St_token_list,  sv_none_token_list, false);
+                                  ("padding",      (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
                                   ("margin",       (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
                                   ("border",       (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
                                   ("anchor",       (St_floats 2),  Sv_floats (2,[|0.5;0.5;|]), false);
@@ -65,7 +66,7 @@ module LayoutElementBase = struct
     ]
 end
 
-(*a Base layout element modules *)
+(*a Aggregate layout element modules *)
 (*m LayoutElementAggrType *)
 module type LayoutElementAggrType = sig
     type et
@@ -73,14 +74,16 @@ module type LayoutElementAggrType = sig
     type lt
     val styles       : (string * Stylesheet.Value.t_styleable_type * Stylesheet.Value.t_styleable_value * bool) list
     val style_desc   : Stylesheet.t_styleable_desc
-    val type_name    : et -> string
+    val type_name_et  : et -> string
+    val type_name_rt  : rt -> string
+    val type_name_lt  : lt -> string
     val resolve_styles : et -> Stylesheet.t_stylesheet -> Stylesheet.t_styleable -> rt
     val get_min_bbox : rt -> Primitives.t_rect
     val make_layout_within_bbox : rt -> Primitives.t_rect -> lt
     val render_svg   : lt -> int -> Svg.t list
 end
 
-(*m ElementFunc *)
+(*m ElementFunc - create the actual Element from a LayoutElementAggrType *)
 module ElementFunc (LE : LayoutElementAggrType) = struct
     (*t th - Basic header *)
     type th = Primitives.t_hdr
@@ -106,6 +109,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
         th : th;
         rt : LE.rt;
         layout_properties  : Layout.t_layout_properties;
+        reval : Reval.t_reval;
         content_rt : rt list;
       }
 
@@ -114,6 +118,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
         th : th;
         rt : LE.rt;
         layout_properties  : Layout.t_layout_properties;
+        reval : Reval.t_reval;
         content_bbox : Primitives.t_rect;
         element_bbox : Primitives.t_rect;
         min_bbox     : Primitives.t_rect;
@@ -127,12 +132,54 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
         lt : LE.lt;
         layout : Layout.t;
         ltr    : Layout.t_transform;
-        content_layout : lt list;
+        (* for evaluation? layout_properties  : Layout.t_layout_properties; *)
+        reval : Reval.t_reval;
+        content_lt : lt list;
         bbox : Primitives.t_rect;
       }
 
-    (*t gt - Fully resolved geometry type *)
+    (*t gt - Fully resolved geometry type with evaluations completed *)
     type gt = lt
+
+    (*f pp_attr *)
+    let pp_attr ppf name value =
+      Format.pp_print_string ppf (Printf.sprintf "%s=%s " name value);
+      ()
+
+    (*f pp_open *)
+    let pp_open ppf name (th:th) =
+      Format.pp_open_tag ppf name ;
+      let id = th.id in
+      pp_attr ppf "id" id;
+      ()
+
+    (*f pp_close *)
+    let pp_close ppf _ =
+      Format.pp_close_tag ppf ();
+      ()
+
+    (*f pp_element *)
+    let rec pp_element ppf (et:et) =
+      pp_open ppf (LE.type_name_et et.et) et.th;
+      List.iter (fun (n,v) -> pp_attr ppf n v) et.properties;
+      List.iter (pp_element ppf) et.content_et;
+      pp_close ppf ()
+
+    (*f pp_etb *)
+    let rec pp_etb ppf (etb:etb) =
+      pp_open ppf (LE.type_name_rt etb.rt) etb.th;
+      Format.fprintf ppf "ele_bbox:%s" (Rectangle.str etb.element_bbox);
+      Format.fprintf ppf "cont_bbox:%s" (Rectangle.str etb.content_bbox);
+      Format.fprintf ppf "min_bbox:%s" (Rectangle.str etb.min_bbox);
+      List.iter (pp_etb ppf) etb.content_etb;
+      pp_close ppf ()
+
+    (*f pp_layout *)
+    let rec pp_layout ppf (lt:lt) =
+      pp_open ppf (LE.type_name_lt lt.lt) lt.th;
+      Format.fprintf ppf "bbox:%s" (Rectangle.str lt.bbox);
+      List.iter (pp_layout ppf) lt.content_lt;
+      pp_close ppf ()
 
     (*v Stylesheet - one for the whole document, not every element *)
     let create_stylesheet _ = 
@@ -149,7 +196,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     let rec make_styleable stylesheet (et:et) : st=
       let content_st = List.map (make_styleable stylesheet) et.content_et in
       let st_list = List.map (fun st -> st.styleable) content_st in
-      let styleable = Stylesheet.se_create LE.style_desc stylesheet (LE.type_name et.et) et.properties (fun _ -> ()) st_list in
+      let styleable = Stylesheet.se_create LE.style_desc stylesheet (LE.type_name_et et.et) et.properties (fun _ -> ()) st_list in
       List.iter (Stylesheet.se_set_parent styleable) st_list;
       { th=et.th; et=et.et; styleable; content_st; }
 
@@ -158,7 +205,8 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       let content_rt = List.map (resolve_styles stylesheet) st.content_st in
       let rt = LE.resolve_styles st.et stylesheet st.styleable in
       let layout_properties = Layout.make_layout_hdr stylesheet st.styleable in
-      { th=st.th; rt; layout_properties; content_rt}
+      let reval = Reval.make "" in
+      { th=st.th; rt; layout_properties; reval; content_rt}
 
     (*f layout_content_create - create layout using any necessary et properties and etb content *)
     let layout_content_create (rt:rt) etb_list =
@@ -173,7 +221,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       let content_bbox  = Layout.get_min_bbox layout in
       let merged_bbox   = Rectangle.union element_bbox content_bbox in
       let min_bbox      = Layout.expand_bbox rt.layout_properties merged_bbox in
-      { th=rt.th; rt=rt.rt; layout_properties=rt.layout_properties; content_bbox; element_bbox; min_bbox; layout; content_etb }
+      { th=rt.th; rt=rt.rt; layout_properties=rt.layout_properties; reval=rt.reval; content_bbox; element_bbox; min_bbox; layout; content_etb }
 
     (*f make_layout_within_bbox - make lt from etb *)
     let rec make_layout_within_bbox (etb:etb) bbox = 
@@ -183,21 +231,16 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
         let bbox = Layout.get_bbox_element etb.layout ltr x.layout_properties x.min_bbox in
         make_layout_within_bbox x bbox
       in
-      let content_layout = List.map layout_content_element etb.content_etb in
-      { th=etb.th; lt; layout=etb.layout; ltr; content_layout; bbox;}
+      let content_lt = List.map layout_content_element etb.content_etb in
+      { th=etb.th; lt; reval=etb.reval; layout=etb.layout; ltr; content_lt; bbox;}
 
-    (* finalize geometry *)
-    (* get geometry field (float along line?) *)
+    (*f finalize geometry *)
+    (*f get geometry field (float along line?) *)
+    (*f show_layout *)
     let rec show_layout lt indent =
       Printf.printf "%sid '%s' : bbox '%s'\n" indent lt.th.id (Rectangle.str lt.bbox);
       let indent = String.concat "" ["  "; indent] in
-      List.iter (fun x -> show_layout x indent) lt.content_layout
-
-    (*f render_svg lt index - return a list of SVG tags that make up the element *)
-    let rec render_svg lt zindex =
-      let content_svg   = List.fold_left (fun a x -> a @ (render_svg x zindex)) [] lt.content_layout in
-      let element_svg   = LE.render_svg lt.lt zindex in
-      Layout.render_svg lt.layout lt.ltr (content_svg @ element_svg) 
+      List.iter (fun x -> show_layout x indent) lt.content_lt
 
     (*f layout_elements *)
     let layout_elements stylesheet page_bbox et =
@@ -206,8 +249,21 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
         Stylesheet.apply stylesheet;
         let rt  = resolve_styles stylesheet st in
         let etb = make_min_bbox rt in
+
+    pp_etb Format.std_formatter etb ;
+    Format.print_flush ();
+    Printf.printf "\n";
+
         let lt  = make_layout_within_bbox etb page_bbox in
         lt
+
+    (*f render_svg lt index - return a list of SVG tags that make up the element *)
+    let rec render_svg lt zindex =
+      let content_svg   = List.fold_left (fun a x -> a @ (render_svg x zindex)) [] lt.content_lt in
+      let element_svg   = LE.render_svg lt.lt zindex in
+      Layout.render_svg lt.layout lt.ltr (content_svg @ element_svg) 
+
+    (*f All done *)
 
 end
 

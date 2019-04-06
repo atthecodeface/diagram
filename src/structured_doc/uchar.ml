@@ -7,6 +7,12 @@ let is_whitespace ch =
     match ch with | 9 | 10 | 11 | 12 | 13 | 32 | 133 | 160 -> true
                   | _ -> false
 
+let is_digit ch = ((ch>=48) && (ch<=57))
+
+let is_comment_start ch =
+    match ch with | 59 -> true
+                  | _ -> false
+
 let is_tag_start ch =
     match ch with | 35 -> true
                   | _ -> false

@@ -108,6 +108,9 @@ module Rectangle = struct
     let get_height bbox_r =
       let (d0,d1,d2,d3) = bbox_r in
       d3-.d1
+    let get_cwh bbox_r =
+      let (d0,d1,d2,d3) = bbox_r in
+      ((d0+.d2)/.2., (d1+.d3)/.2., d2-.d0, d3-.d1)
    
     let str (a0,a1,a2,a3) = Printf.sprintf "(%f,%f,%f,%f)" a0 a1 a2 a3
 end

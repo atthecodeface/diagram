@@ -4,6 +4,7 @@ Add support for human-markup input and output
  *)
 type t_attr = | StringAttr of (string * string)
               | FloatAttr of (string * float)
+              | FloatsAttr of (string * (float array))
               | RectangleAttr of (string * (float*float*float*float))
 
 type t = {
@@ -12,16 +13,32 @@ attributes : t_attr list;
 cdata    : string list;
 contents : t list;
   }
+let string_of_float f =
+  let s = Printf.sprintf "%f" f in
+  let n = String.length s in
+  let rec skip_back_zeros n =
+    if n<=0 then 1 else (
+      if (String.get s n) != '0' then (n+1) else
+        skip_back_zeros (n-1)
+    )
+  in
+  let skip_back_trailing_point n =
+    if (String.get s (n-1)) == '.' then (n-1) else n
+  in
+  String.sub s 0 (skip_back_trailing_point (skip_back_zeros (n-1)))
+
 let attribute_string n v = StringAttr (n, v)
 let attribute_float  n v = FloatAttr (n, v)
+let attribute_floats  n v = FloatsAttr (n, v)
 let attribute_rectangle n r = RectangleAttr (n, r)
 let attribute_text t = 
   match t with 
   | StringAttr (n,v) -> Printf.sprintf "%s='%s'" n v
-  | FloatAttr (n,v) -> Printf.sprintf "%s='%f'" n v
+  | FloatAttr (n,v) -> Printf.sprintf "%s='%s'" n (string_of_float v)
+  | FloatsAttr (n,v) -> Printf.sprintf "%s='%s'" n (String.concat " " (Array.fold_left (fun acc v->acc@[(string_of_float v)]) [] v))
   | RectangleAttr (n,v) -> 
     let (d0, d1, d2, d3) = v in
-    Printf.sprintf "%s='%f %f %f %f'" n d0 d1 d2 d3
+    Printf.sprintf "%s='%s %s %s %s'" n (string_of_float d0) (string_of_float d1) (string_of_float d2) (string_of_float d3)
 let tag tag_type attributes contents cdata = { tag_type; attributes; contents; cdata; }
 let pretty_print_indented indent f t s =
     Printf.fprintf f "%s%s\n" indent s

@@ -297,24 +297,33 @@ shrink content bbox by padding/border/margin?
  *)
 let layout_within_bbox t bbox = 
     let internal_bbox = Primitives.Rectangle.(shrink (shrink (shrink bbox t.props.margin) t.props.border) t.props.padding) in
-    Printf.printf "Bbox %s int bbox %s\n" (Primitives.Rectangle.str bbox) (Primitives.Rectangle.str internal_bbox);
-    let (dw,dh) = Primitives.Rectangle.get_wh internal_bbox in
-    let (dx,dy,_,_) = internal_bbox in
-    let (cw,ch) = Primitives.Rectangle.get_wh t.min_bbox in
-    let (cx,cy,_,_) = t.min_bbox in
+    Printf.printf "Bbox %s int bbox %s\n" (Primitives.Rectangle.str bbox) (Primitives.Rectangle.str t.min_bbox);
+    (* dcx,dcy , dw,dh is center/size of the bbox to layout in after margin reduction *)
+    let (dcx,dcy,dw,dh) = Primitives.Rectangle.get_cwh internal_bbox in
+    (* ccx,ccy , cw,ch is center/size of the min bbox for our contents *)
+    (* let (ccx,ccy,cw,ch) = Primitives.Rectangle.get_cwh t.min_bbox in *)
+    (* should determine content layout w/h - assume same as now - but could expand it *)
+    let (cw,ch) = (dw,dh) in
+    (* So spare space can be determined - presumably +ve *)
+    let (slack_x,slack_y) = ((dw-.cw),(dh-.ch)) in
+    (* adjust ccx and ccy appropriately - depends on anchor coord *)
+    (* ax,ay is the anchor coordinates - i.e. where (ccx,ccy) is anchored - ignore for now *)
     let (ax,ay) = (0.,0.) in
-    let ox = dx -. cx +. (dw-.cw) *. ax in
-    let oy = dy -. cy +. (dh-.ch) *. ay in
-    let translate = (ox,oy) in
+    (*  *)
+    let ccx = dcx +. slack_x *. ax in
+    let ccy = dcy +. slack_y *. ay in
+    let content_bbox = (ccx-.cw/.2., ccy-.ch/.2., ccx+.cw/.2., ccy+.ch/.2.) in
+    let translate = default_translate in
     let scale     = default_scale in
-    let transform = {translate; scale; bbox;} in
-    (transform, bbox)
+    let transform = {translate; scale; bbox;} in (* bbox is used for the border generation *)
+    (transform, content_bbox)
 
 let get_bbox_element t tr cp min_bbox = 
   if (is_placed cp) then min_bbox else (
     let (cs,rs,cw,rw) = (match cp.grid with | None->(0,0,0,0) | Some x->x) in
     let (x0,x1) = GridDimension.get_bbox (List.hd t.grids) cs cw in
     let (y0,y1) = GridDimension.get_bbox (List.nth t.grids 1) rs rw in
+    Printf.printf "\nbbox for grid %f,%f, %f,%f, %d,%d,%d,%d\n" x0 y0 x1 y1 cs rs cw rw;
     (x0,y0,x1,y1)
   )
 
@@ -353,7 +362,7 @@ let svg_append_border t tr s =
   let (bw,_,_,_) = t.props.border in
   if (Color.is_none t.props.border_color) then s else 
     let stroke = Color.svg_attr "stroke" t.props.border_color in
-    let stroke_width = Svg.attribute_string "stroke-width" (Printf.sprintf "%f" bw) in
+    let stroke_width = Svg.attribute_string "stroke-width" (Printf.sprintf "%f" (bw/.2.)) in
     let fill   = Svg.attribute_string "fill" "none" in
     let path = Svg.tag "path" [stroke; fill; stroke_width; coords] [] [] in
     s @ [path]
