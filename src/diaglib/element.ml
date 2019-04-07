@@ -23,18 +23,37 @@ module Rectangle = Primitives.Rectangle
 module Layout = Layout
 module Svg = Svg
 
+(*a Useful functions *)
+(*f list_collapse *)
+let rec list_collapse f = function
+  | [] -> None
+  | hd::tl -> match f hd with
+              | Some x -> Some x
+              | None -> list_collapse f tl
+
+(*f list_find *)
+let list_find f = list_collapse (fun x->if (f x) then Some x else None)
+
 (*a Base layout element modules *)
 (*m LayoutElementType *)
+type t_style_resolver = {
+   value_as_float        : ?default:float -> string -> float;
+   value_as_floats       : ?default:float array -> string -> float array;
+   value_as_string       : ?default:string -> string -> string;
+   value_as_color_string : ?default:float -> string -> string;
+  }
 module type LayoutElementType = sig
     type et   (* base element type *)
     type rt   (* resolved styled of element type - does not include t *)
     type lt   (* layout of element type - does not include rt or t *)
+    type gt   (* finalized geometry of element type - does not include lt, rt or t *)
 
     val styles       : (string * Stylesheet.Value.t_styleable_type * Stylesheet.Value.t_styleable_value * bool) list
-    val resolve_styles : et -> Stylesheet.t_stylesheet -> Stylesheet.t_styleable -> rt
+    val resolve_styles : et -> t_style_resolver -> rt
     val get_min_bbox : et -> rt -> Primitives.t_rect
     val make_layout_within_bbox : et -> rt -> Primitives.t_rect -> lt
-    val render_svg   : et -> rt -> lt -> int -> Svg.t list
+    val finalize_geometry : et -> rt -> lt -> t_style_resolver -> gt
+    val render_svg   : et -> rt -> lt -> gt -> int -> Svg.t list
 end
 
 (*m LayoutElementFunc *)
@@ -42,16 +61,19 @@ module LayoutElementFunc (E:LayoutElementType) = struct
     type et = E.et
     type rt = E.rt
     type lt = E.lt
+    type gt = E.gt
     let styles = E.styles
     let resolve_styles = E.resolve_styles
     let get_min_bbox = E.get_min_bbox
     let make_layout_within_bbox = E.make_layout_within_bbox
+    let finalize_geometry = E.finalize_geometry
     let render_svg = E.render_svg
 end
 
 (*m LayoutElementBase *)
 module LayoutElementBase = struct
   let styles = Stylesheet.Value.[ ("class",        St_token_list,  sv_none_token_list, false);
+                                  ("reval",        St_string,      sv_none_string, false);
                                   ("padding",      (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
                                   ("margin",       (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
                                   ("border",       (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
@@ -72,19 +94,25 @@ module type LayoutElementAggrType = sig
     type et
     type rt
     type lt
+    type gt
     val styles       : (string * Stylesheet.Value.t_styleable_type * Stylesheet.Value.t_styleable_value * bool) list
     val style_desc   : Stylesheet.t_styleable_desc
     val type_name_et  : et -> string
     val type_name_rt  : rt -> string
     val type_name_lt  : lt -> string
-    val resolve_styles : et -> Stylesheet.t_stylesheet -> Stylesheet.t_styleable -> rt
+    val type_name_gt  : gt -> string
+    val resolve_styles : et -> t_style_resolver -> rt
     val get_min_bbox : rt -> Primitives.t_rect
     val make_layout_within_bbox : rt -> Primitives.t_rect -> lt
-    val render_svg   : lt -> int -> Svg.t list
+    val get_value : lt -> string -> Reval.Value.t option
+    val finalize_geometry : lt -> t_style_resolver -> gt
+    val render_svg   : gt -> int -> Svg.t list
 end
 
 (*m ElementFunc - create the actual Element from a LayoutElementAggrType *)
 module ElementFunc (LE : LayoutElementAggrType) = struct
+    exception Eval_error of string
+
     (*t th - Basic header *)
     type th = Primitives.t_hdr
 
@@ -139,7 +167,14 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       }
 
     (*t gt - Fully resolved geometry type with evaluations completed *)
-    type gt = lt
+    type gt = {
+        th : th;
+        gt : LE.gt;
+        layout : Layout.t;
+        ltr    : Layout.t_transform;
+        content_gt : gt list;
+        bbox : Primitives.t_rect;
+      }
 
     (*f pp_attr *)
     let pp_attr ppf name value =
@@ -181,6 +216,13 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       List.iter (pp_layout ppf) lt.content_lt;
       pp_close ppf ()
 
+    (*f pp_geometry *)
+    let rec pp_geometry ppf (gt:gt) =
+      pp_open ppf (LE.type_name_gt gt.gt) gt.th;
+      Format.fprintf ppf "bbox:%s" (Rectangle.str gt.bbox);
+      List.iter (pp_geometry ppf) gt.content_gt;
+      pp_close ppf ()
+
     (*v Stylesheet - one for the whole document, not every element *)
     let create_stylesheet _ = 
       let stylesheet = Stylesheet.create () in
@@ -203,9 +245,19 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     (*f resolve_styles <stylesheet> <element> : rt - resolve all the properties from the stylesheet ready for layout *)
     let rec resolve_styles stylesheet (st:st) : rt =
       let content_rt = List.map (resolve_styles stylesheet) st.content_st in
-      let rt = LE.resolve_styles st.et stylesheet st.styleable in
+      let resolver = {
+          value_as_float        = (fun ?default s -> Stylesheet.styleable_value_as_float ?default:default stylesheet st.styleable s);
+          value_as_floats       = (fun ?default s -> Stylesheet.styleable_value_as_floats ?default:default stylesheet st.styleable s);
+          value_as_string       = (fun ?default s -> Stylesheet.styleable_value_as_string ?default:default stylesheet st.styleable s);
+          value_as_color_string = (fun ?default s -> Stylesheet.styleable_value_as_color_string stylesheet st.styleable s);
+        } in
+      let rt = LE.resolve_styles st.et resolver in
       let layout_properties = Layout.make_layout_hdr stylesheet st.styleable in
-      let reval = Reval.make "" in
+      let reval_string = Stylesheet.styleable_value_as_string ~default:"" stylesheet st.styleable "reval" in
+      let reval = 
+        try Reval.make reval_string
+        with Reval.Syntax_error s -> raise (Eval_error (Printf.sprintf "Syntax error '%s' when parsing '%s' for '%s'" s reval_string st.th.id))
+      in
       { th=st.th; rt; layout_properties; reval; content_rt}
 
     (*f layout_content_create - create layout using any necessary et properties and etb content *)
@@ -234,16 +286,33 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       let content_lt = List.map layout_content_element etb.content_etb in
       { th=etb.th; lt; reval=etb.reval; layout=etb.layout; ltr; content_lt; bbox;}
 
-    (*f finalize geometry *)
-    let finalize_geometry lt =
-      lt
+    (*f finalize geometry - needs rev_stack *)
+    let rec finalize_geometry rev_stack lt : gt =
+      let content_gt = List.map (finalize_geometry (lt::rev_stack)) lt.content_lt in
+      let find_child (lt:lt) id =
+        match list_find (fun (x:lt)-> String.equal x.th.id id) lt.content_lt with
+        | None -> raise Not_found
+        | Some x -> x
+      in
+      let get_ref    (lt:lt) = lt.reval in
+      let get_value  (lt:lt) s = LE.get_value lt.lt s in
+      let get_id     (lt:lt) = lt.th.id in
+      let tres = Reval.make_resolver find_child get_ref get_value get_id in
+      ignore (Reval.resolve_all tres lt rev_stack);
+      let resolver = {
+          value_as_float        = (fun ?default _ -> 0.);
+          value_as_floats       = (fun ?default _ -> [|0.|]);
+          value_as_string       = (fun ?default _ -> "");
+          value_as_color_string = (fun ?default _ -> "black");
+        } in
+      let gt = LE.finalize_geometry lt.lt resolver in
+      { th=lt.th; gt=gt; layout=lt.layout; ltr=lt.ltr; content_gt; bbox=lt.bbox;}
 
-    (*f get geometry field (float along line?) *)
     (*f show_layout *)
-    let rec show_layout lt indent =
-      Printf.printf "%sid '%s' : bbox '%s'\n" indent lt.th.id (Rectangle.str lt.bbox);
+    let rec show_layout gt indent =
+      Printf.printf "%sid '%s' : bbox '%s'\n" indent gt.th.id (Rectangle.str gt.bbox);
       let indent = String.concat "" ["  "; indent] in
-      List.iter (fun x -> show_layout x indent) lt.content_lt
+      List.iter (fun x -> show_layout x indent) gt.content_gt
 
     (*f layout_elements *)
     let layout_elements stylesheet page_bbox et =
@@ -258,13 +327,13 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     Printf.printf "\n";
 
         let lt  = make_layout_within_bbox etb page_bbox in
-        let gt  = finalize_geometry lt in
+        let gt  = finalize_geometry [] lt in
         gt
 
     (*f render_svg gt index - return a list of SVG tags that make up the element *)
     let rec render_svg gt zindex =
-      let content_svg   = List.fold_left (fun a x -> a @ (render_svg x zindex)) [] gt.content_lt in
-      let element_svg   = LE.render_svg gt.lt zindex in
+      let content_svg   = List.fold_left (fun a x -> a @ (render_svg x zindex)) [] gt.content_gt in
+      let element_svg   = LE.render_svg gt.gt zindex in
       Layout.render_svg gt.layout gt.ltr (content_svg @ element_svg) 
 
     (*f All done *)

@@ -31,15 +31,15 @@ let main () =
     Element.pp_element Format.std_formatter b ;
     Format.print_flush ();
     Printf.printf "\n";
-    let lt = Element.layout_elements stylesheet page_bbox b in
+    let gt = Element.layout_elements stylesheet page_bbox b in
 
-    Element.pp_layout Format.std_formatter lt ;
+    Element.pp_geometry Format.std_formatter gt ;
     Format.print_flush ();
     Printf.printf "\n";
 
-    Element.show_layout lt "";
+    Element.show_layout gt "";
     let oc = open_out "a.svg" in
-    let svg = Svg.svg_doc (Element.render_svg lt 0) page_bbox in
+    let svg = Svg.svg_doc (Element.render_svg gt 0) page_bbox in
     Svg.svg_print_hdr oc;
     Svg.pretty_print oc svg;
     close_out oc;

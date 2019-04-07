@@ -158,5 +158,6 @@ let styleable_value_as_color_string ?default stylesheet styleable name = Value_r
 let styleable_value_as_floats ?default stylesheet styleable name = Value_ref.get_value_as_floats ?default:default (Styleable.get_value_ref styleable stylesheet name)
 let styleable_value_as_float ?default stylesheet styleable name = Value_ref.get_value_as_float ?default:default (Styleable.get_value_ref styleable stylesheet name)
 let styleable_value_as_ints ?default stylesheet styleable name = Value_ref.get_value_as_ints ?default:default (Styleable.get_value_ref styleable stylesheet name)
+let styleable_value_as_string ?default stylesheet styleable name = Value_ref.get_value_as_string ?default:default (Styleable.get_value_ref styleable stylesheet name)
 
 

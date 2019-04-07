@@ -55,13 +55,15 @@ module PathInt : LayoutElementType = struct
     type et = int
     type rt = int
     type lt = Primitives.t_rect
+    type gt = int
 
-    let resolve_styles et stylesheet styleable : rt = 0
+    let resolve_styles et resolver : rt = 0
 
     let r = Rectangle.mk_fixed (0.,0.,100.,20.)
     let get_min_bbox et rt = (0.,0.,100.,20.)
     let make_layout_within_bbox et rt bbox = bbox
-    let render_svg et rt lt i = 
+    let finalize_geometry et rt lt resolver = 0
+    let render_svg et rt lt gt i = 
       []
 end
 
@@ -79,10 +81,15 @@ end = struct
       }
     type rt = {
         size  : float;
-        color : string;
     (* anchor / alignment *)
       }
     type lt = Primitives.t_rect (* Rectangle to place text within *)
+    type gt = {
+        size  : float;
+        color : string;
+        x : float;
+        y : float;
+      }
 
     let styles = Stylesheet.Value.[
                    ("font_size",  St_float,  Sv_float (Some 12.), true);
@@ -91,26 +98,29 @@ end = struct
 
     let make font text = {font; text}
 
-    let resolve_styles et stylesheet styleable : rt =
-      let size  = Stylesheet.styleable_value_as_float stylesheet styleable "font_size" in
-      let color = Stylesheet.styleable_value_as_color_string stylesheet styleable "font_color" in
-      {size; color}
+    let resolve_styles et (resolver:Element.t_style_resolver) : rt =
+      let size  = resolver.value_as_float         "font_size" in
+      {size;}
 
     let r = Rectangle.mk_fixed (0.,0.,100.,20.)
     let get_min_bbox et rt = (0.,0.,100.,20.)
     let make_layout_within_bbox et rt bbox = 
       Printf.printf "\nText layout bbox %s\n\n" (Rectangle.str bbox);
       bbox
-    let svg_use et rt lt = 
+    let finalize_geometry et (rt:rt) lt (resolver:Element.t_style_resolver) = 
+      let color = resolver.value_as_color_string  "font_color" in
       let (x0,y0,x1,y1) = lt in
+      {x=x0; y=y0; size=rt.size; color;}
+
+    let svg_use et rt lt gt = 
       Svg.(tag "text" [(* font-family, stroke *)
-                                     FloatAttr ("x", x0);
-                                     FloatAttr ("y", y1);
-                                     FloatAttr ("font-size", rt.size);
-                                     StringAttr ("fill", rt.color);
+                                     FloatAttr ("x", gt.x);
+                                     FloatAttr ("y", gt.y);
+                                     FloatAttr ("font-size", gt.size);
+                                     StringAttr ("fill", gt.color);
                     ] [] et.text)
-    let render_svg et rt lt i = 
-      let svg = svg_use et rt lt in
+    let render_svg et rt lt gt i = 
+      let svg = svg_use et rt lt gt in
       [svg]
 end
 
@@ -123,13 +133,15 @@ end = struct
     type et = int
     type rt = int
     type lt = Primitives.t_rect
+    type gt = lt
 
     let get_min_bbox et rt = Rectangle.zeros
 
     let make _ = 0
-    let resolve_styles et stylesheet styleable : rt = 0
+    let resolve_styles et (resolver:Element.t_style_resolver) : rt = 0
     let make_layout_within_bbox et rt bbox = bbox
-    let render_svg et rt lt i = []
+    let finalize_geometry et rt lt resolver = lt
+    let render_svg et rt lt gt i = []
 
 end
 
@@ -156,6 +168,11 @@ module DiagramElement = struct
   type lt = | LBox of  Box.et * Box.rt * Box.lt
             | LText of Text.et * Text.rt * Text.lt
             | LPath of Path.et * Path.rt * Path.lt
+
+  (*t gt - Additional finalized geometry structure for the element *)
+  type gt = | GBox  of Box.et * Box.rt * Box.lt * Box.gt
+            | GText of Text.et * Text.rt * Text.lt * Text.gt
+            | GPath of Path.et * Path.rt * Path.lt * Path.gt
 
   let styles  = 
     Text.styles @ Path.styles @ Box.styles
@@ -184,15 +201,23 @@ module DiagramElement = struct
     | LPath (e,r,l) -> EPath e
     | LBox  (e,r,l) -> EBox e
 
+  let et_of_gt gt =
+    match gt with
+    | GText (e,r,l,g) -> EText e
+    | GPath (e,r,l,g) -> EPath e
+    | GBox  (e,r,l,g) -> EBox e
+
   let type_name_rt rt = type_name_et (et_of_rt rt)
 
   let type_name_lt lt = type_name_et (et_of_lt lt)
 
-  let resolve_styles et stylesheet styleable =
+  let type_name_gt gt = type_name_et (et_of_gt gt)
+
+  let resolve_styles et (resolver:Element.t_style_resolver) =
     match et with
-    | EText e      -> RText (e,Text.resolve_styles e stylesheet styleable)
-    | EPath e      -> RPath (e,Path.resolve_styles e stylesheet styleable)
-    | EBox  e      -> RBox  (e,Box.resolve_styles e stylesheet styleable)
+    | EText e      -> RText (e,Text.resolve_styles e resolver)
+    | EPath e      -> RPath (e,Path.resolve_styles e resolver)
+    | EBox  e      -> RBox  (e,Box.resolve_styles  e resolver)
 
   let get_min_bbox rt = 
     match rt with
@@ -206,11 +231,20 @@ module DiagramElement = struct
     | RPath (e,r)  -> LPath  (e,r,(Path.make_layout_within_bbox e r bbox))
     | RBox  (e,r)  -> LBox   (e,r,(Box.make_layout_within_bbox e r bbox))
 
-  let render_svg lt zindex = 
+  let get_value lt s = None
+     (* Reval.Value.t option *)
+
+  let finalize_geometry lt res = 
     match lt with
-    | LText (e,r,l) -> Text.render_svg e r l zindex
-    | LPath (e,r,l) -> Path.render_svg e r l zindex
-    | LBox  (e,r,l) -> []
+    | LText (e,r,l) -> GText (e,r,l,(Text.finalize_geometry e r l res))
+    | LPath (e,r,l) -> GPath (e,r,l,(Path.finalize_geometry e r l res))
+    | LBox  (e,r,l) -> GBox  (e,r,l,(Box.finalize_geometry  e r l res))
+ 
+  let render_svg gt zindex = 
+    match gt with
+    | GText (e,r,l,g) -> Text.render_svg e r l g zindex
+    | GPath (e,r,l,g) -> Path.render_svg e r l g zindex
+    | GBox  (e,r,l,g) -> []
 
 end
 

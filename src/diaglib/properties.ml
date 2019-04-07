@@ -110,3 +110,4 @@ let get_property_color stylesheet styleable name =
     let f = Stylesheet.styleable_value_as_floats stylesheet styleable name in
     Color.Rgb (f.(0), f.(1), f.(2))
   )
+

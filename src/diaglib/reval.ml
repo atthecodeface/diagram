@@ -330,7 +330,8 @@ module ExpressionFn = struct
     {name = "sqrt"; fn = unary_float_fn sqrt} ;
     {name = "sqr";  fn = unary_float_fn (fun x -> x ** 2.) };
     {name = "neg";  fn = unary_float_fn (fun x -> -. x) };
-    {name = "sub";  fn = int_value_fn Value.subscript };
+    {name = "sub";  fn = int_value_fn   Value.subscript };
+    {name = "split";  fn = int_value_fn   Value.split };
     {name = "mod";  fn = unary_value_fn Value.modulus };
     {name = "len";  fn = unary_value_fn (fun s -> Value.(of_int (size s))) };
     ]
@@ -631,6 +632,7 @@ module Assignment = struct
 
   (*e Recursive_evaluation *)
   exception Recursive_evaluation of t
+  exception Failed_to_evaluate of t * exn
 
   (*f build_from_tokens *)
   let build_from_tokens tl =
@@ -654,7 +656,10 @@ module Assignment = struct
       | Some f -> f
       | None -> (
         a.in_eval <- true;
-        let value = Expression.evaluate rfn a.expression in
+        let value = 
+          try Expression.evaluate rfn a.expression with
+          | e -> raise (Failed_to_evaluate (a, e))
+        in
         a.value <- Some value;
         a.in_eval <- false;
         value
@@ -676,6 +681,8 @@ end
 module Reval = struct
   (*e Unexpected_character *)
   exception Unexpected_character of string
+  exception Unknown_lvalue of string
+  exception Failed_to_evaluate = Assignment.Failed_to_evaluate
 
   (*t t *)
   type t = {
@@ -716,12 +723,68 @@ module Reval = struct
   let list_assigns t =
     List.map (fun a->Assignment.name a)t.assigns
 
+  (*t t_resolver *)
+  type 'a t_resolver = {
+    find_child : 'a -> string -> 'a;
+    get_id     : 'a -> string;
+    get_ref    : 'a -> t;
+    get_value  : 'a -> string -> Value.t option; (* Get the value of 'string' thing within 'a us if possible *)
+    }
+
+  (*f make_resolver *)
+  let make_resolver find_child get_ref get_value get_id =
+    {find_child; get_ref; get_value; get_id}
+
+  (*f resolve_value *)
+  let hier tres rev_stack = List.fold_left (fun acc t -> Printf.sprintf "%s.%s" (tres.get_id t) acc) "" rev_stack
+
+  let rec evaluate tres rev_stack lvalue =
+    let t = List.hd rev_stack in
+    try (
+      match value_of (tres.get_ref t) lvalue (fun tr -> resolve_value tres rev_stack tr.parents tr.names) with
+      | Some v -> v
+      | None -> (
+        match tres.get_value t lvalue with
+        | Some v -> v
+        | None ->       let hier = hier tres rev_stack in
+                        raise (Unknown_lvalue (hier ^ lvalue))
+      )
+    ) with
+    | Failed_to_evaluate (a,e) -> (
+      let hier = hier tres rev_stack in
+      Printf.printf "Evaluating %s\n" (hier ^ (Assignment.name a));
+      raise e
+    )
+  and resolve_value tres rev_stack parents names =
+    if (parents>0) then 
+      resolve_value tres (List.tl rev_stack) (parents-1) names
+    else
+      match names with 
+      | lvalue::[] -> evaluate tres rev_stack lvalue
+      | id::tl ->
+        let t = List.hd rev_stack in
+        let t = tres.find_child t id in
+        resolve_value tres (t::rev_stack) 0 tl
+      | _ -> raise Not_found (* Should not be possible *)
+
+  (*f resolve_all *)
+  let resolve_all (tres : 'a t_resolver) (t:'a) (rev_stack: 'a list)  =
+    (*List.map (fun a -> let lvalue=Assignment.name a in (lvalue, resolve_value tres rev_stack 0 [lvalue])) t.assigns*)
+    List.map (fun a ->
+        let lvalue=Assignment.name a in
+        (lvalue, evaluate tres (t::rev_stack) lvalue)
+      ) (tres.get_ref t).assigns
+
   (*f All done *)    
 end
 
 (*a Promote things to module level *)
+exception Syntax_error = Token.Syntax_error
 let make = Reval.make
+let make_resolver = Reval.make_resolver
+let resolve_all = Reval.resolve_all
 type t_reval = Reval.t
+type 'a t_resolver = 'a Reval.t_resolver
 
 (*a Test stuff *)
 (*f test_stack *)
@@ -773,12 +836,13 @@ let test_tokens _ =
   Array.iteri (Printf.printf "%d %f\n") fa;
   ()
 
+
   type test_t = { r : Reval.t;
              id : string;
              children : test_t list;
            }
-exception Unknown_lvalue of string
-exception Unknown_child of string
+
+  exception Unknown_child of string
 let test_assignment _ =
   let find_child r id =
     let rec find_it = function
@@ -792,26 +856,10 @@ let test_assignment _ =
   let t1 = {r=r1; id="r1"; children=[]} in
   let r0 = Reval.make "a=.r1.c;b=.a .r1.d +;e=5;" in
   let t0 = {r=r0; id="top"; children=[t1;]} in
-  let rec resolve_value (rev_stack:test_t list) parents names =
-    if (parents>0) then 
-      resolve_value (List.tl rev_stack) (parents-1) names
-    else
-      let t = List.hd rev_stack in
-      match names with 
-      | lvalue::[] -> (
-        match Reval.value_of t.r lvalue (fun tr -> resolve_value rev_stack tr.parents tr.names) with
-        | Some v -> v
-        | None -> raise (Unknown_lvalue lvalue)
-      )
-      | id::tl ->  (
-        let t = find_child t id in
-        resolve_value (t::rev_stack) 0 tl
-      )
-      | _ -> raise Not_found (* Should not be possible *)
-  in
   let al = t0.r in
   List.iter (Printf.printf "Assigns '%s'\n") (Reval.list_assigns al);
-  let v = resolve_value [t0] 0 ["b"] in
+  let tres = make_resolver find_child (fun t->t.r) (fun _ s -> None) (fun t->t.id) in
+  let v = Reval.resolve_value tres [t0] 0 ["b"] in
   Printf.printf "Value type %s\n" (Value.str_type v);
   let fa = Value.flatten v in
   Array.iteri (Printf.printf "%d %f\n") fa;
@@ -821,7 +869,7 @@ let test_assignment _ =
 let _ =  test_stack ()
 let _ = test_expr ()
 let _ = test_tokens ()
- *)
 let _ = test_assignment ()
+ *)
 
 

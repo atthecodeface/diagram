@@ -312,7 +312,7 @@ let as_ints ?default svalue =
 (*f as_string - get a string an svalue *)
 let as_string ?default svalue =
   if (is_none svalue) then (
-    match default with | Some f -> f | None -> raise (Bad_value "No default value provided when getting value as_ints")
+    match default with | Some f -> f | None -> raise (Bad_value "No default value provided when getting value as_string")
   ) else (
   match svalue with
   | Sv_string (Some s) -> s

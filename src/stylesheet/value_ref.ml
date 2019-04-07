@@ -67,6 +67,9 @@
   (*f get_value_as_ints t - get the value as an array of ints *)
   let get_value_as_ints ?default t   =  Value.as_ints ?default:default t.value
 
+  (*f get_value_as_string t - get the value as a string *)
+  let get_value_as_string ?default t   =  Value.as_string ?default:default t.value
+
   (*f set_default_inherit - set the default inheritance *)
   let set_default_inherit t di = t.default_inherit <- di
 
