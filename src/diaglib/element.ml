@@ -34,14 +34,59 @@ let rec list_collapse f = function
 (*f list_find *)
 let list_find f = list_collapse (fun x->if (f x) then Some x else None)
 
-(*a Base layout element modules *)
-(*m LayoutElementType *)
+(*a Base layout element types and modules *)
+(*t t_element_value *)
+type t_element_value =
+  | Ev_rect       of Primitives.t_rect
+  | Ev_floats     of int * (float array)
+  | Ev_float      of float
+  | Ev_vector     of float * float
+  | Ev_string     of string
+
+type t_element_properties = (string * t_element_value) list
+
+exception Bad_type of string
+
+let str_type_of_element_value = function
+  | Ev_float _ -> "float"
+  | Ev_floats (n,_) -> Printf.sprintf "floats[%d]" n
+  | Ev_rect r -> "rect"
+  | Ev_vector _ -> "vector"
+  | Ev_string _ -> "string"
+
+let reval_of_element_value = function
+  | Ev_float f -> Reval.Value.of_float f
+  | Ev_floats (n,arr) -> Reval.Value.of_floats arr 0 n
+  | Ev_rect r ->
+               let (x0,y0,x1,y1)=r in
+               Reval.Value.of_floats2 [|x0;x1;x1;x0|] [|y0;y0;y1;y1|] 0 4
+  | Ev_vector (x,y) -> Reval.Value.make_vector x y
+  | _ -> Reval.Value.no_value
+
+let element_value_as_float = function
+  | Ev_float f -> f
+  | x -> raise (Bad_type (Printf.sprintf "wanted a float but had a %s" (str_type_of_element_value x)))
+
+let element_value_as_floats = function
+  | Ev_float f        -> [|f;|]
+  | Ev_floats (n,arr) -> arr
+  | Ev_vector (f0,f1) -> [|f0;f1;|]
+  | Ev_rect r         -> Primitives.Rectangle.as_floats r
+  | x -> raise (Bad_type (Printf.sprintf "wanted floats but had a %s" (str_type_of_element_value x)))
+
+let element_value_as_string = function
+  | Ev_string s -> s
+  | x -> raise (Bad_type (Printf.sprintf "wanted a string but had a %s" (str_type_of_element_value x)))
+
+(*t t_style_resolver *)
 type t_style_resolver = {
    value_as_float        : ?default:float -> string -> float;
    value_as_floats       : ?default:float array -> string -> float array;
    value_as_string       : ?default:string -> string -> string;
    value_as_color_string : ?default:float -> string -> string;
   }
+
+(*m LayoutElementType *)
 module type LayoutElementType = sig
     type et   (* base element type *)
     type rt   (* resolved styled of element type - does not include t *)
@@ -49,28 +94,14 @@ module type LayoutElementType = sig
     type gt   (* finalized geometry of element type - does not include lt, rt or t *)
 
     val styles       : (string * Stylesheet.Value.t_styleable_type * Stylesheet.Value.t_styleable_value * bool) list
-    val resolve_styles : et -> t_style_resolver -> rt
+    val resolve_styles : et -> t_style_resolver -> (rt * t_element_properties)
     val get_min_bbox : et -> rt -> Primitives.t_rect
-    val make_layout_within_bbox : et -> rt -> Primitives.t_rect -> lt
+    val make_layout_within_bbox : et -> rt -> Primitives.t_rect -> (lt * t_element_properties)
     val finalize_geometry : et -> rt -> lt -> t_style_resolver -> gt
     val render_svg   : et -> rt -> lt -> gt -> int -> Svg.t list
 end
 
-(*m LayoutElementFunc *)
-module LayoutElementFunc (E:LayoutElementType) = struct
-    type et = E.et
-    type rt = E.rt
-    type lt = E.lt
-    type gt = E.gt
-    let styles = E.styles
-    let resolve_styles = E.resolve_styles
-    let get_min_bbox = E.get_min_bbox
-    let make_layout_within_bbox = E.make_layout_within_bbox
-    let finalize_geometry = E.finalize_geometry
-    let render_svg = E.render_svg
-end
-
-(*m LayoutElementBase *)
+(*m LayoutElementBase - included in all LayoutElementType *)
 module LayoutElementBase = struct
   let styles = Stylesheet.Value.[ ("class",        St_token_list,  sv_none_token_list, false);
                                   ("reval",        St_string,      sv_none_string, false);
@@ -86,6 +117,28 @@ module LayoutElementBase = struct
                                   ("border_color", St_rgb,         sv_none_rgb, true); (* inherit *)
                                   ("fill_color",   St_rgb,         sv_none_rgb, true); (* inherit *)
     ]
+
+end
+
+(*m LayoutElementFunc - create LayoutElement for aggregate from a LayoutElementType *)
+module LayoutElementFunc (E:LayoutElementType) = struct
+  type et = E.et
+  type rt = E.rt
+  type lt = E.lt
+  type gt = E.gt
+  let styles = E.styles
+  let resolve_styles et res = (
+      let layout_pl = ["padding",Ev_floats (4, res.value_as_floats "padding");
+                       "margin",Ev_floats (4, res.value_as_floats "padding");
+                       "border",Ev_floats (4, res.value_as_floats "padding");
+                       "bbox",Ev_rect Primitives.Rectangle.zeros;
+                      ] in
+      let (rt,pl) = E.resolve_styles et res in (rt,pl@layout_pl)
+    )
+  let get_min_bbox = E.get_min_bbox
+  let make_layout_within_bbox = E.make_layout_within_bbox
+  let finalize_geometry = E.finalize_geometry
+  let render_svg = E.render_svg
 end
 
 (*a Aggregate layout element modules *)
@@ -101,10 +154,9 @@ module type LayoutElementAggrType = sig
     val type_name_rt  : rt -> string
     val type_name_lt  : lt -> string
     val type_name_gt  : gt -> string
-    val resolve_styles : et -> t_style_resolver -> rt
+    val resolve_styles : et -> t_style_resolver -> (rt * t_element_properties)
     val get_min_bbox : rt -> Primitives.t_rect
-    val make_layout_within_bbox : rt -> Primitives.t_rect -> lt
-    val get_value : lt -> string -> Reval.Value.t option
+    val make_layout_within_bbox : rt -> Primitives.t_rect -> (lt * t_element_properties)
     val finalize_geometry : lt -> t_style_resolver -> gt
     val render_svg   : gt -> int -> Svg.t list
 end
@@ -136,6 +188,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     type rt = {
         th : th;
         rt : LE.rt;
+        properties : (string * t_element_value) list;
         layout_properties  : Layout.t_layout_properties;
         reval : Reval.t_reval;
         content_rt : rt list;
@@ -145,6 +198,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     type etb = {
         th : th;
         rt : LE.rt;
+        properties : (string * t_element_value) list;
         layout_properties  : Layout.t_layout_properties;
         reval : Reval.t_reval;
         content_bbox : Primitives.t_rect;
@@ -158,9 +212,9 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     type lt = {
         th : th;
         lt : LE.lt;
+        properties : (string * t_element_value) list;
         layout : Layout.t;
         ltr    : Layout.t_transform;
-        (* for evaluation? layout_properties  : Layout.t_layout_properties; *)
         reval : Reval.t_reval;
         content_lt : lt list;
         bbox : Primitives.t_rect;
@@ -251,14 +305,14 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
           value_as_string       = (fun ?default s -> Stylesheet.styleable_value_as_string ?default:default stylesheet st.styleable s);
           value_as_color_string = (fun ?default s -> Stylesheet.styleable_value_as_color_string stylesheet st.styleable s);
         } in
-      let rt = LE.resolve_styles st.et resolver in
+      let (rt, properties) = LE.resolve_styles st.et resolver in
       let layout_properties = Layout.make_layout_hdr stylesheet st.styleable in
       let reval_string = Stylesheet.styleable_value_as_string ~default:"" stylesheet st.styleable "reval" in
       let reval = 
         try Reval.make reval_string
         with Reval.Syntax_error s -> raise (Eval_error (Printf.sprintf "Syntax error '%s' when parsing '%s' for '%s'" s reval_string st.th.id))
       in
-      { th=st.th; rt; layout_properties; reval; content_rt}
+      { th=st.th; rt; properties; layout_properties; reval; content_rt}
 
     (*f layout_content_create - create layout using any necessary et properties and etb content *)
     let layout_content_create (rt:rt) etb_list =
@@ -273,18 +327,26 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       let content_bbox  = Layout.get_min_bbox layout in
       let merged_bbox   = Rectangle.union element_bbox content_bbox in
       let min_bbox      = Layout.expand_bbox rt.layout_properties merged_bbox in
-      { th=rt.th; rt=rt.rt; layout_properties=rt.layout_properties; reval=rt.reval; content_bbox; element_bbox; min_bbox; layout; content_etb }
+      let properties = rt.properties in
+      { th=rt.th; rt=rt.rt; properties; layout_properties=rt.layout_properties; reval=rt.reval; content_bbox; element_bbox; min_bbox; layout; content_etb }
 
     (*f make_layout_within_bbox - make lt from etb *)
     let rec make_layout_within_bbox (etb:etb) bbox = 
       let (ltr, bbox) = Layout.layout_within_bbox etb.layout bbox in
-      let lt = LE.make_layout_within_bbox etb.rt bbox in
+      let (lt, properties) = LE.make_layout_within_bbox etb.rt bbox in
       let layout_content_element (x : etb) =
         let bbox = Layout.get_bbox_element etb.layout ltr x.layout_properties x.min_bbox in
         make_layout_within_bbox x bbox
       in
       let content_lt = List.map layout_content_element etb.content_etb in
-      { th=etb.th; lt; reval=etb.reval; layout=etb.layout; ltr; content_lt; bbox;}
+      let properties = properties @ etb.properties in
+      { th=etb.th; lt; properties; reval=etb.reval; layout=etb.layout; ltr; content_lt; bbox;}
+
+    (*f get_reval_value_from_properties pl -> s -> Reval.t option *)
+    let get_reval_value_from_properties pl s =
+      match list_find (fun (ps,pv)->String.equal s ps) pl with
+      | Some (_,v) -> Some (reval_of_element_value v)
+      | None -> None
 
     (*f finalize geometry - needs rev_stack *)
     let rec finalize_geometry rev_stack lt : gt =
@@ -295,7 +357,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
         | Some x -> x
       in
       let get_ref    (lt:lt) = lt.reval in
-      let get_value  (lt:lt) s = LE.get_value lt.lt s in
+      let get_value  (lt:lt) s = get_reval_value_from_properties lt.properties s in
       let get_id     (lt:lt) = lt.th.id in
       let tres = Reval.make_resolver find_child get_ref get_value get_id in
       ignore (Reval.resolve_all tres lt rev_stack);

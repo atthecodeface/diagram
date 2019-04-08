@@ -57,12 +57,21 @@ module PathInt : LayoutElementType = struct
     type lt = Primitives.t_rect
     type gt = int
 
-    let resolve_styles et resolver : rt = 0
+    let styles = Stylesheet.Value.[
+                   ("coords",  St_floats 0,  Sv_floats (0,[||]), true);
+                   ("color",   St_rgb,       Sv_rgb [|0.;0.;0.;|], true);
+                   ("width",   St_float,     Sv_float (Some 1.), true);
+                 ] @ styles
+    let resolve_styles et resolver = 
+      let rt : rt = 0 in
+      (rt, [])
 
     let r = Rectangle.mk_fixed (0.,0.,100.,20.)
     let get_min_bbox et rt = (0.,0.,100.,20.)
-    let make_layout_within_bbox et rt bbox = bbox
-    let finalize_geometry et rt lt resolver = 0
+    let make_layout_within_bbox et rt bbox = (bbox, [])
+    let finalize_geometry et rt lt (resolver:Element.t_style_resolver) =
+      let c = resolver.value_as_float "coords" in
+      0
     let render_svg et rt lt gt i = 
       []
 end
@@ -98,15 +107,16 @@ end = struct
 
     let make font text = {font; text}
 
-    let resolve_styles et (resolver:Element.t_style_resolver) : rt =
+    let resolve_styles et (resolver:Element.t_style_resolver) =
       let size  = resolver.value_as_float         "font_size" in
-      {size;}
+      let rt:rt = {size;} in
+      (rt, [])
 
     let r = Rectangle.mk_fixed (0.,0.,100.,20.)
     let get_min_bbox et rt = (0.,0.,100.,20.)
     let make_layout_within_bbox et rt bbox = 
       Printf.printf "\nText layout bbox %s\n\n" (Rectangle.str bbox);
-      bbox
+      (bbox, [])
     let finalize_geometry et (rt:rt) lt (resolver:Element.t_style_resolver) = 
       let color = resolver.value_as_color_string  "font_color" in
       let (x0,y0,x1,y1) = lt in
@@ -138,8 +148,10 @@ end = struct
     let get_min_bbox et rt = Rectangle.zeros
 
     let make _ = 0
-    let resolve_styles et (resolver:Element.t_style_resolver) : rt = 0
-    let make_layout_within_bbox et rt bbox = bbox
+    let resolve_styles et (resolver:Element.t_style_resolver) =
+      let rt : rt = 0 in
+      (rt, [])
+    let make_layout_within_bbox et rt bbox = (bbox, [])
     let finalize_geometry et rt lt resolver = lt
     let render_svg et rt lt gt i = []
 
@@ -215,9 +227,9 @@ module DiagramElement = struct
 
   let resolve_styles et (resolver:Element.t_style_resolver) =
     match et with
-    | EText e      -> RText (e,Text.resolve_styles e resolver)
-    | EPath e      -> RPath (e,Path.resolve_styles e resolver)
-    | EBox  e      -> RBox  (e,Box.resolve_styles  e resolver)
+    | EText e      -> let (r,pl) = Text.resolve_styles e resolver in (RText (e,r), pl)
+    | EPath e      -> let (r,pl) = Path.resolve_styles e resolver in (RPath (e,r), pl)
+    | EBox  e      -> let (r,pl) = Box.resolve_styles  e resolver in (RBox  (e,r), pl)
 
   let get_min_bbox rt = 
     match rt with
@@ -225,14 +237,11 @@ module DiagramElement = struct
     | RPath (e,r)      -> Path.get_min_bbox e r
     | RBox  (e,r)      -> Box.get_min_bbox  e r
 
-  let make_layout_within_bbox rt (bbox : Primitives.t_rect) : lt = 
+  let make_layout_within_bbox rt (bbox : Primitives.t_rect) = 
     match rt with
-    | RText (e,r)  -> LText  (e,r,(Text.make_layout_within_bbox e r bbox))
-    | RPath (e,r)  -> LPath  (e,r,(Path.make_layout_within_bbox e r bbox))
-    | RBox  (e,r)  -> LBox   (e,r,(Box.make_layout_within_bbox e r bbox))
-
-  let get_value lt s = None
-     (* Reval.Value.t option *)
+    | RText (e,r)  -> let (l,pl) = Text.make_layout_within_bbox e r bbox in (LText (e,r,l), pl)
+    | RPath (e,r)  -> let (l,pl) = Path.make_layout_within_bbox e r bbox in (LPath (e,r,l), pl)
+    | RBox  (e,r)  -> let (l,pl) = Box.make_layout_within_bbox  e r bbox in (LBox  (e,r,l), pl)
 
   let finalize_geometry lt res = 
     match lt with

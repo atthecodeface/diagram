@@ -75,6 +75,7 @@ module Rectangle = struct
                | Fixed of t_rect
                | Func of (t_expr_resolver -> t_value)
     let zeros = (0., 0., 0., 0.)
+    let as_floats (a,b,c,d) = [|a;b;c;d;|]
     let add_values a b =
       let (a0,a1,a2,a3) = a in
       let (b0,b1,b2,b3) = b in

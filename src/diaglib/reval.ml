@@ -36,6 +36,9 @@ module Value = struct
   (*f of_float float -> t *)
   let of_float f =  Float f
 
+  (*f make_vector float -> float -> t *)
+  let make_vector f0 f1 = Vector (f0, f1)
+
   (*f of_array t -> int -> int -> t *)
   let of_array arr s n = Subarray (s,n,arr)
 
@@ -45,7 +48,9 @@ module Value = struct
     let na = Array.init n fill in
     Subarray (0,n,na)
 
-  (*f of_floats2 (float array) -> (float array) -> int -> int -> t as Subarray of Vector *)
+  (*f of_floats2 (float array) -> (float array) -> int -> int -> t as Subarray of Vector
+    Build Array of vectors with xs and ys from two separate arrays
+     *)
   let of_floats2 arr0 arr1 s n = 
     let fill i =  Vector (arr0.(s+i), arr1.(s+i)) in
     let na = Array.init n fill in
@@ -124,9 +129,16 @@ module Value = struct
   let subscript i = function
     | Vector (f0, _)  when (i==0) -> (Float f0)
     | Vector (_,  f1) when (i==1) -> (Float f1)
-    | Subarray (s,n,arr) when ((i>=0) && (i<=n)) ->
+    | Subarray (s,n,arr) when ((i>=0) && (i<n)) ->
        arr.(s+i)
-    | _ -> raise (Invalid_subscript (Printf.sprintf "index %d" i))
+    | Subarray (_,n,_) -> raise (Invalid_subscript (Printf.sprintf "index %d max %d" i n))
+    | _ -> raise (Bad_type "For subscript")
+
+  (*f slice int -> int -> t -> t *)
+  let slice i0 i1 = function
+    | Subarray (s,n,arr) when ((i0>=0) && (i1>i0) && (i1<=n)) ->
+       Subarray (s+i0,i1-i0,arr)
+    | _ -> raise (Bad_type "For slice")
 
   (*f size t -> int *)
   let size = function
@@ -167,6 +179,15 @@ module Value = struct
     | Subarray (s,n,arr) ->
        let na = Array.init n (fun i -> modulus arr.(s+i)) in
        Subarray (0,n,na)
+
+  (*f close t -> t
+    close of an array is an array with the first element replicated at the end
+     *)
+  let close = function
+    | Subarray (s,n,arr) ->
+       let na = Array.init (n+1) (fun i -> if i<n then arr.(s+i) else arr.(s)) in
+       Subarray (0,n+1,na)
+    | _ -> raise (Bad_type "For close")
 
   (*f apply_binary_float_fn (float -> float -> float) -> t -> t *)
   let str_type = function
@@ -321,6 +342,15 @@ module ExpressionFn = struct
     let r = f i v in
     Stack.push_value s r
                      
+  (*f int_int_value_fn (int -> int -> Value.t -> Value.t) -> Stack.t -> unit *)
+  let int_int_value_fn f s = 
+    let v = Stack.get_rel s 3 in
+    let i0 = Value.as_int (Stack.get_rel s 2) in
+    let i1 = Value.as_int (Stack.get_rel s 1) in
+    Stack.pop s 3;
+    let r = f i0 i1 v in
+    Stack.push_value s r
+                     
   (*v functions - add in functions *)
   let functions =  [
     {name = "+"; fn = binary_float_fn (fun x y -> x +. y)} ;
@@ -331,7 +361,9 @@ module ExpressionFn = struct
     {name = "sqr";  fn = unary_float_fn (fun x -> x ** 2.) };
     {name = "neg";  fn = unary_float_fn (fun x -> -. x) };
     {name = "sub";  fn = int_value_fn   Value.subscript };
+    {name = "slice";  fn = int_int_value_fn   Value.slice };
     {name = "split";  fn = int_value_fn   Value.split };
+    {name = "close"; fn = unary_value_fn Value.close} ;
     {name = "mod";  fn = unary_value_fn Value.modulus };
     {name = "len";  fn = unary_value_fn (fun s -> Value.(of_int (size s))) };
     ]
