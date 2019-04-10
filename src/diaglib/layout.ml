@@ -367,10 +367,10 @@ let svg_append_border t tr s =
     let path = Svg.tag "path" [stroke; fill; stroke_width; coords] [] [] in
     s @ [path]
 
-let render_svg t tr svg_contents = 
+let render_svg t tr id svg_contents = 
     let svg_contents = svg_prepend_fill  t tr svg_contents in
     let svg_contents = svg_append_border t tr svg_contents in
     match svg_contents with 
     | [] -> []
     | s -> 
-    [Svg.tag "g" (add_transform_tag tr []) s []]
+    [Svg.tag "g" (add_transform_tag tr [Svg.attribute_string "id" id]) s []]

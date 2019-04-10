@@ -815,6 +815,7 @@ exception Syntax_error = Token.Syntax_error
 let make = Reval.make
 let make_resolver = Reval.make_resolver
 let resolve_all = Reval.resolve_all
+let value_of = Reval.value_of
 type t_reval = Reval.t
 type 'a t_resolver = 'a Reval.t_resolver
 

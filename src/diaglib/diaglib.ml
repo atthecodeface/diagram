@@ -50,30 +50,51 @@ end
 
 (*a PathInt, TextInt, BoxInt - all LayoutElementType modules *)
 (*m PathInt *)
-module PathInt : LayoutElementType = struct
+module PathInt : sig
+    include LayoutElementType
+    val make : unit -> et
+end = struct
     include LayoutElementBase
     type et = int
-    type rt = int
+    type rt = {color:string;}
     type lt = Primitives.t_rect
-    type gt = int
+    type gt = {
+coords : float array;
+      }
 
+    let make _ = 0
     let styles = Stylesheet.Value.[
-                   ("coords",  St_floats 0,  Sv_floats (0,[||]), true);
+                   ("coords",  St_float_arr, sv_none_float_arr, true);
                    ("color",   St_rgb,       Sv_rgb [|0.;0.;0.;|], true);
                    ("width",   St_float,     Sv_float (Some 1.), true);
                  ] @ styles
-    let resolve_styles et resolver = 
-      let rt : rt = 0 in
-      (rt, [])
+    let resolve_styles et (resolver:Element.t_style_resolver) = 
+      let color = resolver.value_as_color_string  "color" in
+      let coords = resolver.value_as_floats ~default:[||] "coords" in
+      let rt : rt = {color} in
+      (rt, ["coords",Element.Ev_floats ((Array.length coords),coords)])
 
     let r = Rectangle.mk_fixed (0.,0.,100.,20.)
     let get_min_bbox et rt = (0.,0.,100.,20.)
-    let make_layout_within_bbox et rt bbox = (bbox, [])
+    let make_layout_within_bbox et rt bbox = (bbox,[])
     let finalize_geometry et rt lt (resolver:Element.t_style_resolver) =
-      let c = resolver.value_as_float "coords" in
-      0
+      let coords = resolver.value_as_floats "coords" in
+      {coords}
     let render_svg et rt lt gt i = 
-      []
+      let rec make_path acc act i n =
+        if (i>=n-1) then acc else (
+          let acc = Printf.sprintf "%s %s %f %f" acc act (gt.coords.(i)) (gt.coords.(i+1)) in
+          make_path acc "L" (i+2) n
+        )
+in
+    let n = Array.length gt.coords in
+    let path = make_path "" "M" 0 n in
+      [ Svg.(tag "path" [ FloatAttr("stroke-width", 1.0);
+                          StringAttr("stroke", rt.color);
+                          StringAttr("fill", "none");
+                          StringAttr("d", path);
+                    ] [] []);
+      ]
 end
 
 (*m TextInt *)
@@ -261,8 +282,9 @@ end
 module Element = struct
     include ElementFunc(DiagramElement)
 
-    let make_text properties id text     = make_et properties id (DiagramElement.EText text) []
-    let make_box  properties id elements = make_et properties id (DiagramElement.EBox (BoxInt.make ())) elements
+    let make_text properties text     = make_et properties (DiagramElement.EText text) []
+    let make_path properties path     = make_et properties (DiagramElement.EPath path) []
+    let make_box  properties elements = make_et properties (DiagramElement.EBox (BoxInt.make ())) elements
 end
 
 (*a Stylesheet things *)
@@ -310,13 +332,15 @@ let from_structured_doc f =
       let contents = List.rev rev_acc in
       let e = (
           match opt_nsn_att with 
-          | None -> Element.make_box [] "toplevel" contents
+          | None -> Element.make_box ["id","toplevel"]  contents
           | Some ((ns,name),attrs) ->  (
              let attrs = List.map (fun ((ns,name),value) -> (name,value)) attrs in
              if (String.equal name "box") then (
-               Element.make_box attrs "b0" contents
+               Element.make_box attrs contents
              ) else if (String.equal name "text") then (
-               Element.make_text attrs "t0" (TextInt.make fnt ["Some text"; ])
+               Element.make_text attrs (TextInt.make fnt ["Some text"; ])
+             ) else if (String.equal name "path") then (
+               Element.make_path attrs (PathInt.make ())
              ) else (
                raise (Bad_tag name)
              )

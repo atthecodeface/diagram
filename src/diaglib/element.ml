@@ -129,20 +129,27 @@ module LayoutElementFunc (E:LayoutElementType) = struct
   let styles = E.styles
   let resolve_styles et res = (
       let layout_pl = ["padding",Ev_floats (4, res.value_as_floats "padding");
-                       "margin",Ev_floats (4, res.value_as_floats "padding");
-                       "border",Ev_floats (4, res.value_as_floats "padding");
+                       "margin",Ev_floats (4, res.value_as_floats "margin");
+                       "border",Ev_floats (4, res.value_as_floats "border");
                        "bbox",Ev_rect Primitives.Rectangle.zeros;
                       ] in
-      let (rt,pl) = E.resolve_styles et res in (rt,pl@layout_pl)
+      let (rt,pl) = E.resolve_styles et res in
+      (rt,pl@layout_pl)
     )
   let get_min_bbox = E.get_min_bbox
-  let make_layout_within_bbox = E.make_layout_within_bbox
+  let make_layout_within_bbox et rt bbox = (
+      let layout_pl = ["bbox",Ev_rect bbox;
+                      ] in
+      let (lt,pl) = E.make_layout_within_bbox et rt bbox in
+      (lt,pl@layout_pl)
+    )
+
   let finalize_geometry = E.finalize_geometry
   let render_svg = E.render_svg
 end
 
 (*a Aggregate layout element modules *)
-(*m LayoutElementAggrType *)
+(*m LayoutElementAggrType - Aggregate module type for a number of LayoutElementFunc submodules *)
 module type LayoutElementAggrType = sig
     type et
     type rt
@@ -284,7 +291,8 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       stylesheet
 
     (*f make_et ... : et - construct the hierarchy within the stylesheet *)
-    let make_et properties id et content_et : et =
+    let make_et properties et content_et : et =
+        let id:string = if List.mem_assoc "id" properties then (List.assoc "id" properties) else "no_id" in
         let th = Primitives.th_make id in
         { th; properties; et; content_et}
 
@@ -342,11 +350,27 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       let properties = properties @ etb.properties in
       { th=etb.th; lt; properties; reval=etb.reval; layout=etb.layout; ltr; content_lt; bbox;}
 
+    (*f properties_value_as_floats pl -> s -> float array option *)
+    let properties_value_as_floats pl s =
+      match list_find (fun (ps,pv)->String.equal s ps) pl with
+      | Some (_,v) -> Some (element_value_as_floats v)
+      | None   -> None
+
     (*f get_reval_value_from_properties pl -> s -> Reval.t option *)
     let get_reval_value_from_properties pl s =
       match list_find (fun (ps,pv)->String.equal s ps) pl with
       | Some (_,v) -> Some (reval_of_element_value v)
       | None -> None
+
+    (*f finalize_value_as_floats *)
+    let finalize_value_as_floats ?default lt s =
+      match Reval.value_of lt.reval s (fun _ -> Reval.Value.no_value) with
+      | Some x -> Reval.Value.flatten x
+      | None -> (
+        match properties_value_as_floats lt.properties s with
+        | Some x -> x
+        | None-> ( match default with |Some x-> x)
+      )
 
     (*f finalize geometry - needs rev_stack *)
     let rec finalize_geometry rev_stack lt : gt =
@@ -363,7 +387,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       ignore (Reval.resolve_all tres lt rev_stack);
       let resolver = {
           value_as_float        = (fun ?default _ -> 0.);
-          value_as_floats       = (fun ?default _ -> [|0.|]);
+          value_as_floats       = (fun ?default s -> finalize_value_as_floats ?default:default lt s);
           value_as_string       = (fun ?default _ -> "");
           value_as_color_string = (fun ?default _ -> "black");
         } in
@@ -396,7 +420,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     let rec render_svg gt zindex =
       let content_svg   = List.fold_left (fun a x -> a @ (render_svg x zindex)) [] gt.content_gt in
       let element_svg   = LE.render_svg gt.gt zindex in
-      Layout.render_svg gt.layout gt.ltr (content_svg @ element_svg) 
+      Layout.render_svg gt.layout gt.ltr gt.th.id (content_svg @ element_svg) 
 
     (*f All done *)
 
