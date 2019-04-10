@@ -362,6 +362,22 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       | Some (_,v) -> Some (reval_of_element_value v)
       | None -> None
 
+    (*f properties_value 'a evfn -> pl -> s -> 'a option *)
+    let properties_value evfn pl s =
+      match list_find (fun (ps,pv)->String.equal s ps) pl with
+      | Some (_,v) -> Some (evfn v)
+      | None   -> None
+
+    (*f finalize_value ?default -> 'a rvfn -> 'a evfn -> lt -> string -> 'a *)
+    let finalize_value ?default rvfn evfn lt s =
+      match Reval.value_of lt.reval s (fun _ -> Reval.Value.no_value) with
+      | Some x -> rvfn x
+      | None -> (
+        match properties_value evfn lt.properties s with
+        | Some x -> x
+        | None-> ( match default with |Some x-> x)
+      )
+
     (*f finalize_value_as_floats *)
     let finalize_value_as_floats ?default lt s =
       match Reval.value_of lt.reval s (fun _ -> Reval.Value.no_value) with
@@ -371,6 +387,10 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
         | Some x -> x
         | None-> ( match default with |Some x-> x)
       )
+
+    (*f finalize_value_as_floats *)
+    let finalize_value_as_floats ?default lt s =
+      finalize_value ?default:default Reval.Value.flatten element_value_as_floats lt s
 
     (*f finalize geometry - needs rev_stack *)
     let rec finalize_geometry rev_stack lt : gt =
