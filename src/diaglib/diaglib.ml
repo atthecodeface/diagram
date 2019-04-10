@@ -139,7 +139,7 @@ end = struct
       Printf.printf "\nText layout bbox %s\n\n" (Rectangle.str bbox);
       (bbox, [])
     let finalize_geometry et (rt:rt) lt (resolver:Element.t_style_resolver) = 
-      let color = resolver.value_as_color_string  "font_color" in
+      let color = resolver.value_as_color_string  ~default:"black" "font_color" in
       let (x0,y0,x1,y1) = lt in
       {x=x0; y=y0; size=rt.size; color;}
 

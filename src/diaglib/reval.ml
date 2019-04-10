@@ -30,6 +30,11 @@ module Value = struct
     | Float f -> int_of_float f
     | _ -> raise (Bad_type "as_int")
 
+  (*f as_float t *)
+  let as_float = function
+    | Float f -> f
+    | _ -> raise (Bad_type "as_float")
+
   (*f of_int int -> t *)
   let of_int n =  Float (float n)
 

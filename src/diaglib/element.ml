@@ -83,7 +83,7 @@ type t_style_resolver = {
    value_as_float        : ?default:float -> string -> float;
    value_as_floats       : ?default:float array -> string -> float array;
    value_as_string       : ?default:string -> string -> string;
-   value_as_color_string : ?default:float -> string -> string;
+   value_as_color_string : ?default:string -> string -> string;
   }
 
 (*m LayoutElementType *)
@@ -311,7 +311,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
           value_as_float        = (fun ?default s -> Stylesheet.styleable_value_as_float ?default:default stylesheet st.styleable s);
           value_as_floats       = (fun ?default s -> Stylesheet.styleable_value_as_floats ?default:default stylesheet st.styleable s);
           value_as_string       = (fun ?default s -> Stylesheet.styleable_value_as_string ?default:default stylesheet st.styleable s);
-          value_as_color_string = (fun ?default s -> Stylesheet.styleable_value_as_color_string stylesheet st.styleable s);
+          value_as_color_string = (fun ?default s -> Stylesheet.styleable_value_as_color_string ?default:default stylesheet st.styleable s);
         } in
       let (rt, properties) = LE.resolve_styles st.et resolver in
       let layout_properties = Layout.make_layout_hdr stylesheet st.styleable in
@@ -350,23 +350,20 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       let properties = properties @ etb.properties in
       { th=etb.th; lt; properties; reval=etb.reval; layout=etb.layout; ltr; content_lt; bbox;}
 
-    (*f properties_value_as_floats pl -> s -> float array option *)
-    let properties_value_as_floats pl s =
-      match list_find (fun (ps,pv)->String.equal s ps) pl with
-      | Some (_,v) -> Some (element_value_as_floats v)
-      | None   -> None
-
-    (*f get_reval_value_from_properties pl -> s -> Reval.t option *)
-    let get_reval_value_from_properties pl s =
-      match list_find (fun (ps,pv)->String.equal s ps) pl with
-      | Some (_,v) -> Some (reval_of_element_value v)
-      | None -> None
-
     (*f properties_value 'a evfn -> pl -> s -> 'a option *)
     let properties_value evfn pl s =
       match list_find (fun (ps,pv)->String.equal s ps) pl with
       | Some (_,v) -> Some (evfn v)
       | None   -> None
+
+    (*f properties_value_as_float pl -> s -> float option *)
+    let properties_value_as_float = properties_value element_value_as_float
+
+    (*f properties_value_as_floats pl -> s -> float array option *)
+    let properties_value_as_floats = properties_value element_value_as_floats
+
+    (*f get_reval_value_from_properties pl -> s -> Reval.t option *)
+    let get_reval_value_from_properties = properties_value reval_of_element_value
 
     (*f finalize_value ?default -> 'a rvfn -> 'a evfn -> lt -> string -> 'a *)
     let finalize_value ?default rvfn evfn lt s =
@@ -375,21 +372,23 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       | None -> (
         match properties_value evfn lt.properties s with
         | Some x -> x
-        | None-> ( match default with |Some x-> x)
+        | None-> ( match default with |Some x-> x | None -> raise (Eval_error (Printf.sprintf "No default to finalize_value '%s'" s)))
       )
 
-    (*f finalize_value_as_floats *)
-    let finalize_value_as_floats ?default lt s =
-      match Reval.value_of lt.reval s (fun _ -> Reval.Value.no_value) with
-      | Some x -> Reval.Value.flatten x
-      | None -> (
-        match properties_value_as_floats lt.properties s with
-        | Some x -> x
-        | None-> ( match default with |Some x-> x)
-      )
+    (*f finalize_value_as_float *)
+    let finalize_value_as_float ?default ~lt:lt s =
+      finalize_value ?default:default Reval.Value.as_float element_value_as_float lt s
+
+    (*f finalize_value_as_string *)
+    let finalize_value_as_string ?default ~lt:lt s =
+      finalize_value ?default:default (fun _ -> "") element_value_as_string lt s
+
+    (*f finalize_value_as_color_string *)
+    let finalize_value_as_color_string ?default ~lt:lt s =
+      finalize_value ?default:default (fun _ -> "") element_value_as_string lt s
 
     (*f finalize_value_as_floats *)
-    let finalize_value_as_floats ?default lt s =
+    let finalize_value_as_floats ?default ~lt:lt s =
       finalize_value ?default:default Reval.Value.flatten element_value_as_floats lt s
 
     (*f finalize geometry - needs rev_stack *)
@@ -406,10 +405,10 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       let tres = Reval.make_resolver find_child get_ref get_value get_id in
       ignore (Reval.resolve_all tres lt rev_stack);
       let resolver = {
-          value_as_float        = (fun ?default _ -> 0.);
-          value_as_floats       = (fun ?default s -> finalize_value_as_floats ?default:default lt s);
-          value_as_string       = (fun ?default _ -> "");
-          value_as_color_string = (fun ?default _ -> "black");
+          value_as_float        = finalize_value_as_float ~lt:lt;
+          value_as_floats       = finalize_value_as_floats ~lt:lt;
+          value_as_string       = finalize_value_as_string ~lt:lt;
+          value_as_color_string = finalize_value_as_color_string ~lt:lt;
         } in
       let gt = LE.finalize_geometry lt.lt resolver in
       { th=lt.th; gt=gt; layout=lt.layout; ltr=lt.ltr; content_gt; bbox=lt.bbox;}
