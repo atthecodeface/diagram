@@ -5,5 +5,5 @@
 #text id=t10 grid=1,0,1,1 font=f0 size=11 color=black ''
 #text id=t01 grid=0,1,1,1 font=f0 size=11 color=black """a"""
 #text id=t11 grid=1,1,1,1 font=f0 size=11 color=black 'Text for t11'
-#path id=p1 grid=0,2,2,1 color=red width=1 reval='coords=.bbox close;'
-#path id=p2 color=blue width=0.5 reval='end0=^.p1.bbox 5 split 2 sub 1 sub; end1=^.t00.bbox 5 split 0 sub 3 sub; coords=.end0 .end1;'
+#path id=p1 grid=0,2,2,1 color=red width=1 eval='coords=.bbox close;'
+#path id=p2 color=blue width=0.5 eval='end0=^.p1.bbox 5 split 2 sub 1 sub; end1=^.t00.bbox 5 split 0 sub 3 sub; coords=.end0 .end1;'

@@ -1,13 +1,10 @@
 (jbuild_version 1)
 
 (library (
-  (name diaglib)
+  (name eval)
   ;(public_name diaglib)
   (libraries (
-    eval
-    stylesheet
-    structured_doc
-    batteries
+  re
   ))
 ))
 

@@ -54,14 +54,14 @@ let str_type_of_element_value = function
   | Ev_vector _ -> "vector"
   | Ev_string _ -> "string"
 
-let reval_of_element_value = function
-  | Ev_float f -> Reval.Value.of_float f
-  | Ev_floats (n,arr) -> Reval.Value.of_floats arr 0 n
+let eval_of_element_value = function
+  | Ev_float f -> Eval.Value.of_float f
+  | Ev_floats (n,arr) -> Eval.Value.of_floats arr 0 n
   | Ev_rect r ->
                let (x0,y0,x1,y1)=r in
-               Reval.Value.of_floats2 [|x0;x1;x1;x0|] [|y0;y0;y1;y1|] 0 4
-  | Ev_vector (x,y) -> Reval.Value.make_vector x y
-  | _ -> Reval.Value.no_value
+               Eval.Value.of_floats2 [|x0;x1;x1;x0|] [|y0;y0;y1;y1|] 0 4
+  | Ev_vector (x,y) -> Eval.Value.make_vector x y
+  | _ -> Eval.Value.no_value
 
 let element_value_as_float = function
   | Ev_float f -> f
@@ -103,19 +103,19 @@ end
 
 (*m LayoutElementBase - included in all LayoutElementType *)
 module LayoutElementBase = struct
-  let styles = Stylesheet.Value.[ ("class",        St_token_list,  sv_none_token_list, false);
-                                  ("reval",        St_string,      sv_none_string, false);
-                                  ("padding",      (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
-                                  ("margin",       (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
-                                  ("border",       (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
-                                  ("anchor",       (St_floats 2),  Sv_floats (2,[|0.5;0.5;|]), false);
-                                  ("expand",       (St_floats 2),  Sv_floats (2,[|0.;0.;|]), false);
-                                  ("place",        (St_floats 2),  sv_none_floats, false);
-                                  ("grid",         (St_ints 4),    sv_none_ints, false);
-                                  ("rotation",     St_float,       sv_none_float, false);
-                                  ("scale",        (St_floats 2),  sv_none_floats, false);
-                                  ("border_color", St_rgb,         sv_none_rgb, true); (* inherit *)
-                                  ("fill_color",   St_rgb,         sv_none_rgb, true); (* inherit *)
+  let styles = Stylesheet.Value.[ (Attr_names.classes, St_token_list,  sv_none_token_list, false);
+                                  (Attr_names.eval,    St_string,      sv_none_string, false);
+                                  (Attr_names.padding,      (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
+                                  (Attr_names.margin,       (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
+                                  (Attr_names.border,       (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
+                                  (Attr_names.anchor,       (St_floats 2),  Sv_floats (2,[|0.5;0.5;|]), false);
+                                  (Attr_names.expand,       (St_floats 2),  Sv_floats (2,[|0.;0.;|]), false);
+                                  (Attr_names.place,        (St_floats 2),  sv_none_floats, false);
+                                  (Attr_names.grid,         (St_ints 4),    sv_none_ints, false);
+                                  (Attr_names.rotation,     St_float,       sv_none_float, false);
+                                  (Attr_names.scale,        (St_floats 2),  sv_none_floats, false);
+                                  (Attr_names.border_color, St_rgb,         sv_none_rgb, true); (* inherit *)
+                                  (Attr_names.fill_color,   St_rgb,         sv_none_rgb, true); (* inherit *)
     ]
 
 end
@@ -128,17 +128,17 @@ module LayoutElementFunc (E:LayoutElementType) = struct
   type gt = E.gt
   let styles = E.styles
   let resolve_styles et res = (
-      let layout_pl = ["padding",Ev_floats (4, res.value_as_floats "padding");
-                       "margin",Ev_floats (4, res.value_as_floats "margin");
-                       "border",Ev_floats (4, res.value_as_floats "border");
-                       "bbox",Ev_rect Primitives.Rectangle.zeros;
+      let layout_pl = [Attr_names.padding,Ev_floats (4, res.value_as_floats Attr_names.padding);
+                       Attr_names.margin,Ev_floats (4, res.value_as_floats Attr_names.margin);
+                       Attr_names.border,Ev_floats (4, res.value_as_floats Attr_names.border);
+                       Attr_names.bbox,Ev_rect Primitives.Rectangle.zeros;
                       ] in
       let (rt,pl) = E.resolve_styles et res in
       (rt,pl@layout_pl)
     )
   let get_min_bbox = E.get_min_bbox
   let make_layout_within_bbox et rt bbox = (
-      let layout_pl = ["bbox",Ev_rect bbox;
+      let layout_pl = [Attr_names.bbox,Ev_rect bbox;
                       ] in
       let (lt,pl) = E.make_layout_within_bbox et rt bbox in
       (lt,pl@layout_pl)
@@ -197,7 +197,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
         rt : LE.rt;
         properties : (string * t_element_value) list;
         layout_properties  : Layout.t_layout_properties;
-        reval : Reval.t_reval;
+        eval : Eval.t_eval;
         content_rt : rt list;
       }
 
@@ -207,7 +207,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
         rt : LE.rt;
         properties : (string * t_element_value) list;
         layout_properties  : Layout.t_layout_properties;
-        reval : Reval.t_reval;
+        eval : Eval.t_eval;
         content_bbox : Primitives.t_rect;
         element_bbox : Primitives.t_rect;
         min_bbox     : Primitives.t_rect;
@@ -222,7 +222,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
         properties : (string * t_element_value) list;
         layout : Layout.t;
         ltr    : Layout.t_transform;
-        reval : Reval.t_reval;
+        eval : Eval.t_eval;
         content_lt : lt list;
         bbox : Primitives.t_rect;
       }
@@ -315,12 +315,12 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
         } in
       let (rt, properties) = LE.resolve_styles st.et resolver in
       let layout_properties = Layout.make_layout_hdr stylesheet st.styleable in
-      let reval_string = Stylesheet.styleable_value_as_string ~default:"" stylesheet st.styleable "reval" in
-      let reval = 
-        try Reval.make reval_string
-        with Reval.Syntax_error s -> raise (Eval_error (Printf.sprintf "Syntax error '%s' when parsing '%s' for '%s'" s reval_string st.th.id))
+      let eval_string = Stylesheet.styleable_value_as_string ~default:"" stylesheet st.styleable Attr_names.eval in
+      let eval = 
+        try Eval.make eval_string
+        with Eval.Syntax_error s -> raise (Eval_error (Printf.sprintf "Syntax error '%s' when parsing '%s' for '%s'" s eval_string st.th.id))
       in
-      { th=st.th; rt; properties; layout_properties; reval; content_rt}
+      { th=st.th; rt; properties; layout_properties; eval; content_rt}
 
     (*f layout_content_create - create layout using any necessary et properties and etb content *)
     let layout_content_create (rt:rt) etb_list =
@@ -336,7 +336,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       let merged_bbox   = Rectangle.union element_bbox content_bbox in
       let min_bbox      = Layout.expand_bbox rt.layout_properties merged_bbox in
       let properties = rt.properties in
-      { th=rt.th; rt=rt.rt; properties; layout_properties=rt.layout_properties; reval=rt.reval; content_bbox; element_bbox; min_bbox; layout; content_etb }
+      { th=rt.th; rt=rt.rt; properties; layout_properties=rt.layout_properties; eval=rt.eval; content_bbox; element_bbox; min_bbox; layout; content_etb }
 
     (*f make_layout_within_bbox - make lt from etb *)
     let rec make_layout_within_bbox (etb:etb) bbox = 
@@ -348,7 +348,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       in
       let content_lt = List.map layout_content_element etb.content_etb in
       let properties = properties @ etb.properties in
-      { th=etb.th; lt; properties; reval=etb.reval; layout=etb.layout; ltr; content_lt; bbox;}
+      { th=etb.th; lt; properties; eval=etb.eval; layout=etb.layout; ltr; content_lt; bbox;}
 
     (*f properties_value 'a evfn -> pl -> s -> 'a option *)
     let properties_value evfn pl s =
@@ -362,12 +362,12 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     (*f properties_value_as_floats pl -> s -> float array option *)
     let properties_value_as_floats = properties_value element_value_as_floats
 
-    (*f get_reval_value_from_properties pl -> s -> Reval.t option *)
-    let get_reval_value_from_properties = properties_value reval_of_element_value
+    (*f get_eval_value_from_properties pl -> s -> Eval.t option *)
+    let get_eval_value_from_properties = properties_value eval_of_element_value
 
     (*f finalize_value ?default -> 'a rvfn -> 'a evfn -> lt -> string -> 'a *)
     let finalize_value ?default rvfn evfn lt s =
-      match Reval.value_of lt.reval s (fun _ -> Reval.Value.no_value) with
+      match Eval.value_of lt.eval s (fun _ -> Eval.Value.no_value) with
       | Some x -> rvfn x
       | None -> (
         match properties_value evfn lt.properties s with
@@ -377,7 +377,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
 
     (*f finalize_value_as_float *)
     let finalize_value_as_float ?default ~lt:lt s =
-      finalize_value ?default:default Reval.Value.as_float element_value_as_float lt s
+      finalize_value ?default:default Eval.Value.as_float element_value_as_float lt s
 
     (*f finalize_value_as_string *)
     let finalize_value_as_string ?default ~lt:lt s =
@@ -389,7 +389,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
 
     (*f finalize_value_as_floats *)
     let finalize_value_as_floats ?default ~lt:lt s =
-      finalize_value ?default:default Reval.Value.flatten element_value_as_floats lt s
+      finalize_value ?default:default Eval.Value.flatten element_value_as_floats lt s
 
     (*f finalize_resolver lt -> resolver *)
     let finalize_resolver lt = {
@@ -407,11 +407,11 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
         | None -> raise Not_found
         | Some x -> x
       in
-      let get_ref    (lt:lt) = lt.reval in
-      let get_value  (lt:lt) s = get_reval_value_from_properties lt.properties s in
+      let get_ref    (lt:lt) = lt.eval in
+      let get_value  (lt:lt) s = get_eval_value_from_properties lt.properties s in
       let get_id     (lt:lt) = lt.th.id in
-      let tres = Reval.make_resolver find_child get_ref get_value get_id in
-      ignore (Reval.resolve_all tres lt rev_stack);
+      let tres = Eval.make_resolver find_child get_ref get_value get_id in
+      ignore (Eval.resolve_all tres lt rev_stack);
       let resolver = finalize_resolver lt in
       let gt = LE.finalize_geometry lt.lt resolver in
       { th=lt.th; gt=gt; layout=lt.layout; ltr=lt.ltr; content_gt; bbox=lt.bbox;}

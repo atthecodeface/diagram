@@ -64,21 +64,21 @@ coords : float array;
 
     let make _ = 0
     let styles = Stylesheet.Value.[
-                   ("coords",  St_float_arr, sv_none_float_arr, true);
-                   ("color",   St_rgb,       Sv_rgb [|0.;0.;0.;|], true);
-                   ("width",   St_float,     Sv_float (Some 1.), true);
+                   (Attr_names.coords,  St_float_arr, sv_none_float_arr, true);
+                   (Attr_names.color,   St_rgb,       Sv_rgb [|0.;0.;0.;|], true);
+                   (Attr_names.width,   St_float,     Sv_float (Some 1.), true);
                  ] @ styles
     let resolve_styles et (resolver:Element.t_style_resolver) = 
-      let color = resolver.value_as_color_string  "color" in
-      let coords = resolver.value_as_floats ~default:[||] "coords" in
+      let color = resolver.value_as_color_string  Attr_names.color in
+      let coords = resolver.value_as_floats ~default:[||] Attr_names.coords in
       let rt : rt = {color} in
-      (rt, ["coords",Element.Ev_floats ((Array.length coords),coords)])
+      (rt, [Attr_names.coords,Element.Ev_floats ((Array.length coords),coords)])
 
     let r = Rectangle.mk_fixed (0.,0.,100.,20.)
     let get_min_bbox et rt = (0.,0.,100.,20.)
     let make_layout_within_bbox et rt bbox = (bbox,[])
     let finalize_geometry et rt lt (resolver:Element.t_style_resolver) =
-      let coords = resolver.value_as_floats "coords" in
+      let coords = resolver.value_as_floats Attr_names.coords in
       {coords}
     let render_svg et rt lt gt i = 
       let rec make_path acc act i n =
@@ -122,14 +122,14 @@ end = struct
       }
 
     let styles = Stylesheet.Value.[
-                   ("font_size",  St_float,  Sv_float (Some 12.), true);
-                   ("font_color", St_rgb,    Sv_rgb [|0.;0.;0.;|], true);
+                   (Attr_names.font_size,  St_float,  Sv_float (Some 12.), true);
+                   (Attr_names.color, St_rgb,         Sv_rgb [|0.;0.;0.;|], true);
                  ] @ styles
 
     let make font text = {font; text}
 
     let resolve_styles et (resolver:Element.t_style_resolver) =
-      let size  = resolver.value_as_float         "font_size" in
+      let size  = resolver.value_as_float         Attr_names.font_size in
       let rt:rt = {size;} in
       (rt, [])
 
@@ -142,7 +142,7 @@ end = struct
       Printf.printf "\nText layout bbox %s\n\n" (Rectangle.str bbox);
       (bbox, [])
     let finalize_geometry et (rt:rt) lt (resolver:Element.t_style_resolver) = 
-      let color = resolver.value_as_color_string  ~default:"black" "font_color" in
+      let color = resolver.value_as_color_string  ~default:"black" Attr_names.color in
       let (x0,y0,x1,y1) = lt in
       {x=x0; y=y0+.y1; size=rt.size; color;}
 
