@@ -391,6 +391,14 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     let finalize_value_as_floats ?default ~lt:lt s =
       finalize_value ?default:default Reval.Value.flatten element_value_as_floats lt s
 
+    (*f finalize_resolver lt -> resolver *)
+    let finalize_resolver lt = {
+        value_as_float        = finalize_value_as_float ~lt:lt;
+        value_as_floats       = finalize_value_as_floats ~lt:lt;
+        value_as_string       = finalize_value_as_string ~lt:lt;
+        value_as_color_string = finalize_value_as_color_string ~lt:lt;
+      }
+
     (*f finalize geometry - needs rev_stack *)
     let rec finalize_geometry rev_stack lt : gt =
       let content_gt = List.map (finalize_geometry (lt::rev_stack)) lt.content_lt in
@@ -404,12 +412,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       let get_id     (lt:lt) = lt.th.id in
       let tres = Reval.make_resolver find_child get_ref get_value get_id in
       ignore (Reval.resolve_all tres lt rev_stack);
-      let resolver = {
-          value_as_float        = finalize_value_as_float ~lt:lt;
-          value_as_floats       = finalize_value_as_floats ~lt:lt;
-          value_as_string       = finalize_value_as_string ~lt:lt;
-          value_as_color_string = finalize_value_as_color_string ~lt:lt;
-        } in
+      let resolver = finalize_resolver lt in
       let gt = LE.finalize_geometry lt.lt resolver in
       { th=lt.th; gt=gt; layout=lt.layout; ltr=lt.ltr; content_gt; bbox=lt.bbox;}
 

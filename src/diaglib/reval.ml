@@ -1,7 +1,5 @@
 (*a To add
 
-dup
-swap
 dupn
 swapn
 popn
@@ -317,27 +315,32 @@ module ExpressionFn = struct
       fn : Stack.t -> unit;
     }
 
-  (*f unary_value_fn (Value.t -> Value.t) -> Stack.t -> unit *)
-  let unary_value_fn f s = 
+  (*f unary_stack_value_fn (Stack.t -> Value.t -> Value.t) -> Stack.t -> unit *)
+  let unary_stack_value_fn f s = 
     let top = Stack.get_rel s 1 in
     Stack.pop s 1;
-    let r = f top in
+    let r = f s top in
     Stack.push_value s r
                      
-  (*f unary_float_fn (float -> float) -> Stack.t -> unit *)
-  let unary_float_fn f s = 
-    let top = Stack.get_rel s 1 in
-    Stack.pop s 1;
-    let r = Value.apply_unary_float_fn f top in
-    Stack.push_value s r
-                     
-  (*f binary_float_fn (float -> float -> float) -> Stack.t -> unit *)
-  let binary_float_fn f s = 
+  (*f binary_stack_value_fn (Stack.t -> Value.t -> Value.t -> Value.t) -> Stack.t -> unit *)
+  let binary_stack_value_fn f s = 
     let t0 = Stack.get_rel s 2 in
     let t1 = Stack.get_rel s 1 in
     Stack.pop s 2;
-    let r = Value.apply_binary_float_fn f t0 t1 in
+    let r = f s t0 t1 in
     Stack.push_value s r
+                     
+  (*f unary_value_fn (Value.t -> Value.t) -> Stack.t -> unit *)
+  let unary_value_fn f = unary_stack_value_fn (fun _ v -> f v)
+                     
+  (*f binary_value_fn (Value.t -> Value.t -> Value.t) -> Stack.t -> unit *)
+  let binary_value_fn f = binary_stack_value_fn (fun _ v0 v1 -> f v0 v1)
+                     
+  (*f unary_float_fn (float -> float) -> Stack.t -> unit *)
+  let unary_float_fn f = unary_value_fn (Value.apply_unary_float_fn f)
+                     
+  (*f binary_float_fn (float -> float -> float) -> Stack.t -> unit *)
+  let binary_float_fn f = binary_value_fn (Value.apply_binary_float_fn f)
                      
   (*f int_value_fn (int -> Value.t -> Value.t) -> Stack.t -> unit *)
   let int_value_fn f s = 
@@ -371,6 +374,8 @@ module ExpressionFn = struct
     {name = "close"; fn = unary_value_fn Value.close} ;
     {name = "mod";  fn = unary_value_fn Value.modulus };
     {name = "len";  fn = unary_value_fn (fun s -> Value.(of_int (size s))) };
+    {name = "dup";  fn = unary_stack_value_fn (fun s v -> Stack.push_value s v; v) };
+    {name = "swap";  fn = binary_stack_value_fn (fun s v0 v1 -> Stack.push_value s v1; v0) };
     ]
 
   (*f find_fn string -> eq_fn option *)

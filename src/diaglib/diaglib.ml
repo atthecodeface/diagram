@@ -141,7 +141,7 @@ end = struct
     let finalize_geometry et (rt:rt) lt (resolver:Element.t_style_resolver) = 
       let color = resolver.value_as_color_string  ~default:"black" "font_color" in
       let (x0,y0,x1,y1) = lt in
-      {x=x0; y=y0; size=rt.size; color;}
+      {x=x0; y=y0+.y1; size=rt.size; color;}
 
     let svg_use et rt lt gt = 
       Svg.(tag "text" [(* font-family, stroke *)
