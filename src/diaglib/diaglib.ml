@@ -134,8 +134,11 @@ end = struct
       (rt, [])
 
     let r = Rectangle.mk_fixed (0.,0.,100.,20.)
-    let get_min_bbox et rt = (0.,0.,100.,20.)
+    let get_min_bbox et rt =
+      (* min bbox is x 0, width of longest string by font, y of 0, height of num lines * (max height of character + line spacing) *)
+     (0.,0.,100.,20.)
     let make_layout_within_bbox et rt bbox = 
+      (* bbox is in the coordinate space for us to do a layout in  can now do centering, and could prepare for justification. *)
       Printf.printf "\nText layout bbox %s\n\n" (Rectangle.str bbox);
       (bbox, [])
     let finalize_geometry et (rt:rt) lt (resolver:Element.t_style_resolver) = 
@@ -322,11 +325,11 @@ open Structured_doc
 
 let from_structured_doc f =
   let fnt = Font.make  "Arial embedded" 10. 3. 5. in
-  let rec read_element_contents opt_nsn_att rev_acc t =
+  let rec read_element_contents opt_nsn_att data rev_acc t =
     match (input t) with
     | `El_start ((ns,name),attrs) -> (
-      let e = read_element_contents (Some ((ns,name),attrs)) [] t in
-      read_element_contents opt_nsn_att (e::rev_acc) t
+      let e = read_element_contents (Some ((ns,name),attrs)) [] [] t in
+      read_element_contents opt_nsn_att [] (e::rev_acc) t
     )
     | `El_end -> (
       let contents = List.rev rev_acc in
@@ -338,7 +341,7 @@ let from_structured_doc f =
              if (String.equal name "box") then (
                Element.make_box attrs contents
              ) else if (String.equal name "text") then (
-               Element.make_text attrs (TextInt.make fnt ["Some text"; ])
+               Element.make_text attrs (TextInt.make fnt data)
              ) else if (String.equal name "path") then (
                Element.make_path attrs (PathInt.make ())
              ) else (
@@ -348,17 +351,17 @@ let from_structured_doc f =
         ) in
          e
     )
-    | `Data _ -> (
-      read_element_contents opt_nsn_att rev_acc t
+    | `Data d -> (
+      read_element_contents opt_nsn_att (data@[d]) rev_acc t
     )
     | `Dtd _ -> (
-      read_element_contents opt_nsn_att rev_acc t
+      read_element_contents opt_nsn_att data rev_acc t
     )
   in
 
   let hml = make_hmlm (Hmlm.make_input ~doc_tag:(("","diag"),[]) f) in
   let diag = (
-      try (read_element_contents None [] hml)
+      try (read_element_contents None [] [] hml)
       with 
       | Xmlm.Error ((l,c),e) -> (
         Printf.printf "Error %s at line %d char %d \n" (Xmlm.error_message e) l c;
