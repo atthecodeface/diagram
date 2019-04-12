@@ -3,7 +3,7 @@ exception Type_mismatch of string
 exception Invalid_subscript of string
 exception Bad_type of string
 
-(*a Basic type and value extraction *)
+(*a Basic type and values *)
 (*t t *)
 type t = | Float of float
          | Vector of (float * float)
@@ -12,53 +12,28 @@ type t = | Float of float
 (*v no_value *)
 let no_value = Float 0.
 
+(*v no_float *)
+let no_float = Float 0.
+
+(*v no_vector *)
+let no_vector = Vector (0., 0.)
+
 (*v no_array *)
 let no_array = Subarray (0,0,(Array.make 0 (Float 0.)))
 
-(*f str_type *)
+(*a Base functions *)
+(*f str_type : t -> string *)
 let str_type = function
   | Float f -> "float"
   | Vector v -> "vector"
   | Subarray (s,n,a) -> Printf.sprintf "array[%d]" n
 
-(*f as_int t *)
-let as_int = function
-  | Float f -> int_of_float f
-  | t -> raise (Bad_type (Printf.sprintf "cannot represent '%s' as int" (str_type t)))
+(*f str : t -> string *)
+let rec str = function
+  | Float f -> Printf.sprintf "float %f" f
+  | Vector (f0,f1) -> Printf.sprintf "vector (%f,%f)" f0 f1
+  | Subarray (s,n,a) -> Printf.sprintf "array[%d;%d] {%s}" s n (String.concat "," (List.map str (Array.to_list a)))
 
-(*f as_float t *)
-let as_float = function
-  | Float f -> f
-  | t -> raise (Bad_type (Printf.sprintf "cannot represent '%s' as float" (str_type t)))
-
-(*a Value creation *)
-(*f of_int int -> t *)
-let of_int n =  Float (float n)
-
-(*f of_float float -> t *)
-let of_float f =  Float f
-
-(*f make_vector float -> float -> t *)
-let make_vector f0 f1 = Vector (f0, f1)
-
-(*f of_array t -> int -> int -> t *)
-let of_array arr s n = Subarray (s,n,arr)
-
-(*f of_floats (float array) -> int -> int -> t as Subarray of Float *)
-let of_floats arr s n = 
-  let fill i =  Float arr.(s+i) in
-  let na = Array.init n fill in
-  Subarray (0,n,na)
-
-(*f of_floats2 (float array) -> (float array) -> int -> int -> t as Subarray of Vector
-    Build Array of vectors with xs and ys from two separate arrays
- *)
-let of_floats2 arr0 arr1 s n = 
-  let fill i =  Vector (arr0.(s+i), arr1.(s+i)) in
-  let na = Array.init n fill in
-  Subarray (0,n,na)
-
-(*a Useful functions *)
 (*f float_range : f0:float -> f1:float -> n -> float array of size n with values f0 to f1 linearly
  *)
 let float_range f0 f1 n =
@@ -96,13 +71,6 @@ let rec fill_float_array a i o t =
        fill_float_array a ni (o+1) t
      )
 
-(*f flatten t -> (float array) *)
-let flatten v =
-  let n = num_floats v in
-  let a = Array.make n 0. in
-  ignore (fill_float_array a 0 0 v);
-  a
-
 (*f subarray_foldi *)
 let rec subarray_foldi f acc arr s n  =
   if (n<=0) then
@@ -120,6 +88,51 @@ let append_value acc value =
      Subarray (0,n+1,na)
   | _ -> raise (Bad_type "For append_value")
 
+(*a Value extraction *)
+(*f as_int t *)
+let as_int = function
+  | Float f -> int_of_float f
+  | t -> raise (Bad_type (Printf.sprintf "cannot represent '%s' as int" (str_type t)))
+
+(*f as_float t *)
+let as_float = function
+  | Float f -> f
+  | t -> raise (Bad_type (Printf.sprintf "cannot represent '%s' as float" (str_type t)))
+
+(*f as_floats t -> (float array) *)
+let as_floats v =
+  let n = num_floats v in
+  let a = Array.make n 0. in
+  ignore (fill_float_array a 0 0 v);
+  a
+
+(*a Value creation *)
+(*f of_int int -> t *)
+let of_int n =  Float (float n)
+
+(*f of_float float -> t *)
+let of_float f =  Float f
+
+(*f make_vector float -> float -> t *)
+let make_vector f0 f1 = Vector (f0, f1)
+
+(*f of_array t -> int -> int -> t *)
+let of_array arr s n = Subarray (s,n,arr)
+
+(*f of_floats (float array) -> int -> int -> t as Subarray of Float *)
+let of_floats arr s n = 
+  let fill i =  Float arr.(s+i) in
+  let na = Array.init n fill in
+  Subarray (0,n,na)
+
+(*f of_floats2 (float array) -> (float array) -> int -> int -> t as Subarray of Vector
+    Build Array of vectors with xs and ys from two separate arrays
+ *)
+let of_floats2 arr0 arr1 s n = 
+  let fill i =  Vector (arr0.(s+i), arr1.(s+i)) in
+  let na = Array.init n fill in
+  Subarray (0,n,na)
+
 (*a Functions to apply to values and arrays etc *)
 (*f apply_unary_float_fn (float -> float) -> t -> t *)
 let rec apply_unary_float_fn fn = function
@@ -128,6 +141,16 @@ let rec apply_unary_float_fn fn = function
   | Subarray (s,n,arr) ->
      let na = Array.init n (fun i -> apply_unary_float_fn fn arr.(s+i)) in
      Subarray (0,n,na)
+
+(*f apply_binary_float_fn (float -> float -> float) -> t -> t *)
+let rec apply_binary_float_fn fn t0 t1 =
+  match (t0, t1) with 
+  | Float f0, Float f1 -> Float (fn f0 f1)
+  | Vector (f00, f01), Vector (f10, f11) -> Vector ((fn f00 f10),(fn f01 f11))
+  | Subarray (s0,n0,arr0), Subarray (s1,n1,arr1) when (n0==n1)->
+     let na = Array.init n0 (fun i -> apply_binary_float_fn fn arr0.(s0+i) arr1.(s1+i)) in
+     Subarray (0,n0,na)
+  | _ -> raise (Type_mismatch (Printf.sprintf "types %s and %s" (str_type t0) (str_type t1)))
 
 (*f subscript int -> t -> t *)
 let subscript i = function
@@ -192,15 +215,5 @@ let close = function
      let na = Array.init (n+1) (fun i -> if i<n then arr.(s+i) else arr.(s)) in
      Subarray (0,n+1,na)
   | _ -> raise (Bad_type "For close")
-
-(*f apply_binary_float_fn (float -> float -> float) -> t -> t *)
-let rec apply_binary_float_fn fn t0 t1 =
-  match (t0, t1) with 
-  | Float f0, Float f1 -> Float (fn f0 f1)
-  | Vector (f00, f01), Vector (f10, f11) -> Vector ((fn f00 f10),(fn f01 f11))
-  | Subarray (s0,n0,arr0), Subarray (s1,n1,arr1) when (n0==n1)->
-     let na = Array.init n0 (fun i -> apply_binary_float_fn fn arr0.(s0+i) arr1.(s1+i)) in
-     Subarray (0,n0,na)
-  | _ -> raise (Type_mismatch (Printf.sprintf "types %s and %s" (str_type t0) (str_type t1)))
 
 (*f All done *)

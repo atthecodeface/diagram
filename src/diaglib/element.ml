@@ -55,13 +55,13 @@ let str_type_of_element_value = function
   | Ev_string _ -> "string"
 
 let eval_of_element_value = function
-  | Ev_float f -> Eval.Value.of_float f
-  | Ev_floats (n,arr) -> Eval.Value.of_floats arr 0 n
+  | Ev_float f -> Eval.value_of_float f
+  | Ev_floats (n,arr) -> Eval.value_of_floats arr 0 n
   | Ev_rect r ->
                let (x0,y0,x1,y1)=r in
-               Eval.Value.of_floats2 [|x0;x1;x1;x0|] [|y0;y0;y1;y1|] 0 4
-  | Ev_vector (x,y) -> Eval.Value.make_vector x y
-  | _ -> Eval.Value.no_value
+               Eval.value_of_floats2 [|x0;x1;x1;x0|] [|y0;y0;y1;y1|] 0 4
+  | Ev_vector (x,y) -> Eval.value_make_vector x y
+  | _ -> Eval.no_value
 
 let element_value_as_float = function
   | Ev_float f -> f
@@ -318,7 +318,11 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       let eval_string = Stylesheet.styleable_value_as_string ~default:"" stylesheet st.styleable Attr_names.eval in
       let eval = 
         try Eval.make eval_string
-        with Eval.Syntax_error s -> raise (Eval_error (Printf.sprintf "Syntax error '%s' when parsing '%s' for '%s'" s eval_string st.th.id))
+        with e -> (
+          match (Eval.eval_error eval_string e) with
+          | Some s -> raise (Eval_error (Printf.sprintf "In parsing eval for %s: %s" st.th.id s))
+          | None -> raise e
+        )
       in
       { th=st.th; rt; properties; layout_properties; eval; content_rt}
 
@@ -367,7 +371,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
 
     (*f finalize_value ?default -> 'a rvfn -> 'a evfn -> lt -> string -> 'a *)
     let finalize_value ?default rvfn evfn lt s =
-      match Eval.value_of lt.eval s (fun _ -> Eval.Value.no_value) with
+      match Eval.value_of lt.eval s (fun _ -> Eval.no_value) with
       | Some x -> rvfn x
       | None -> (
         match properties_value evfn lt.properties s with
@@ -377,7 +381,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
 
     (*f finalize_value_as_float *)
     let finalize_value_as_float ?default ~lt:lt s =
-      finalize_value ?default:default Eval.Value.as_float element_value_as_float lt s
+      finalize_value ?default:default Eval.value_as_float element_value_as_float lt s
 
     (*f finalize_value_as_string *)
     let finalize_value_as_string ?default ~lt:lt s =
@@ -389,7 +393,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
 
     (*f finalize_value_as_floats *)
     let finalize_value_as_floats ?default ~lt:lt s =
-      finalize_value ?default:default Eval.Value.flatten element_value_as_floats lt s
+      finalize_value ?default:default Eval.value_as_floats element_value_as_floats lt s
 
     (*f finalize_resolver lt -> resolver *)
     let finalize_resolver lt = {
