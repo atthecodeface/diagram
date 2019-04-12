@@ -69,9 +69,9 @@ let from_structured_doc f =
              if (String.equal name "box") then (
                Diagram_element.make_box attrs contents
              ) else if (String.equal name "text") then (
-               Diagram_element.make_text attrs (Text.make fnt data)
+               Diagram_element.make_text attrs (De_text.make fnt data)
              ) else if (String.equal name "path") then (
-               Diagram_element.make_path attrs (Path.make ())
+               Diagram_element.make_path attrs (De_path.make ())
              ) else (
                raise (Bad_tag name)
              )

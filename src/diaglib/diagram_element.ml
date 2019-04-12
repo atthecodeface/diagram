@@ -1,36 +1,36 @@
 open Types
 
 (*a DiagramElement (using PathInt, TextInt, BoxInt) and Element *)
-module PathEl = Element.LayoutElementFunc(Path)
-module TextEl = Element.LayoutElementFunc(Text)
-module BoxEl  = Element.LayoutElementFunc(Box)
+module Path = Element.LayoutElementFunc(De_path)
+module Text = Element.LayoutElementFunc(De_text)
+module Box  = Element.LayoutElementFunc(De_box)
 
 (*m DiagramElement *)
 module DiagramElement = struct
   exception Mismatch of string
 
   (*t et - Basic element type *)
-  type et = | EBox  of BoxEl.et
-            | EText of TextEl.et
-            | EPath of PathEl.et
+  type et = | EBox  of Box.et
+            | EText of Text.et
+            | EPath of Path.et
 
   (*t rt - Additional resolved style structure for the element *)
-  type rt = | RBox  of BoxEl.et  * BoxEl.rt
-            | RText of TextEl.et * TextEl.rt
-            | RPath of PathEl.et * PathEl.rt
+  type rt = | RBox  of Box.et  * Box.rt
+            | RText of Text.et * Text.rt
+            | RPath of Path.et * Path.rt
 
   (*t lt - Additional resolved style structure for the element *)
-  type lt = | LBox of  BoxEl.et * BoxEl.rt * BoxEl.lt
-            | LText of TextEl.et * TextEl.rt * TextEl.lt
-            | LPath of PathEl.et * PathEl.rt * PathEl.lt
+  type lt = | LBox of  Box.et * Box.rt * Box.lt
+            | LText of Text.et * Text.rt * Text.lt
+            | LPath of Path.et * Path.rt * Path.lt
 
   (*t gt - Additional finalized geometry structure for the element *)
-  type gt = | GBox  of BoxEl.et * BoxEl.rt * BoxEl.lt * BoxEl.gt
-            | GText of TextEl.et * TextEl.rt * TextEl.lt * TextEl.gt
-            | GPath of PathEl.et * PathEl.rt * PathEl.lt * PathEl.gt
+  type gt = | GBox  of Box.et * Box.rt * Box.lt * Box.gt
+            | GText of Text.et * Text.rt * Text.lt * Text.gt
+            | GPath of Path.et * Path.rt * Path.lt * Path.gt
 
   let styles  = 
-    TextEl.styles @ PathEl.styles @ BoxEl.styles
+    Text.styles @ Path.styles @ Box.styles
 
   let style_desc = Stylesheet.create_desc [] styles
 
@@ -70,32 +70,32 @@ module DiagramElement = struct
 
   let resolve_styles et (resolver:t_style_resolver) =
     match et with
-    | EText e      -> let (r,pl) = TextEl.resolve_styles e resolver in (RText (e,r), pl)
-    | EPath e      -> let (r,pl) = PathEl.resolve_styles e resolver in (RPath (e,r), pl)
-    | EBox  e      -> let (r,pl) = BoxEl.resolve_styles  e resolver in (RBox  (e,r), pl)
+    | EText e      -> let (r,pl) = Text.resolve_styles e resolver in (RText (e,r), pl)
+    | EPath e      -> let (r,pl) = Path.resolve_styles e resolver in (RPath (e,r), pl)
+    | EBox  e      -> let (r,pl) = Box.resolve_styles  e resolver in (RBox  (e,r), pl)
 
   let get_min_bbox rt = 
     match rt with
-    | RText (e,r)      -> TextEl.get_min_bbox e r
-    | RPath (e,r)      -> PathEl.get_min_bbox e r
-    | RBox  (e,r)      -> BoxEl.get_min_bbox  e r
+    | RText (e,r)      -> Text.get_min_bbox e r
+    | RPath (e,r)      -> Path.get_min_bbox e r
+    | RBox  (e,r)      -> Box.get_min_bbox  e r
 
   let make_layout_within_bbox rt (bbox : Primitives.t_rect) = 
     match rt with
-    | RText (e,r)  -> let (l,pl) = TextEl.make_layout_within_bbox e r bbox in (LText (e,r,l), pl)
-    | RPath (e,r)  -> let (l,pl) = PathEl.make_layout_within_bbox e r bbox in (LPath (e,r,l), pl)
-    | RBox  (e,r)  -> let (l,pl) = BoxEl.make_layout_within_bbox  e r bbox in (LBox  (e,r,l), pl)
+    | RText (e,r)  -> let (l,pl) = Text.make_layout_within_bbox e r bbox in (LText (e,r,l), pl)
+    | RPath (e,r)  -> let (l,pl) = Path.make_layout_within_bbox e r bbox in (LPath (e,r,l), pl)
+    | RBox  (e,r)  -> let (l,pl) = Box.make_layout_within_bbox  e r bbox in (LBox  (e,r,l), pl)
 
   let finalize_geometry lt res = 
     match lt with
-    | LText (e,r,l) -> GText (e,r,l,(TextEl.finalize_geometry e r l res))
-    | LPath (e,r,l) -> GPath (e,r,l,(PathEl.finalize_geometry e r l res))
-    | LBox  (e,r,l) -> GBox  (e,r,l,(BoxEl.finalize_geometry  e r l res))
+    | LText (e,r,l) -> GText (e,r,l,(Text.finalize_geometry e r l res))
+    | LPath (e,r,l) -> GPath (e,r,l,(Path.finalize_geometry e r l res))
+    | LBox  (e,r,l) -> GBox  (e,r,l,(Box.finalize_geometry  e r l res))
  
   let render_svg gt zindex = 
     match gt with
-    | GText (e,r,l,g) -> TextEl.render_svg e r l g zindex
-    | GPath (e,r,l,g) -> PathEl.render_svg e r l g zindex
+    | GText (e,r,l,g) -> Text.render_svg e r l g zindex
+    | GPath (e,r,l,g) -> Path.render_svg e r l g zindex
     | GBox  (e,r,l,g) -> []
 
 end
@@ -105,5 +105,5 @@ include Element_func.ElementFunc(DiagramElement)
 
 let make_text properties text     = make_et properties (DiagramElement.EText text) []
 let make_path properties path     = make_et properties (DiagramElement.EPath path) []
-let make_box  properties elements = make_et properties (DiagramElement.EBox (Box.make ())) elements
+let make_box  properties elements = make_et properties (DiagramElement.EBox (De_box.make ())) elements
 

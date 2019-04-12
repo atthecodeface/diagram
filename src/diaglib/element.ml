@@ -23,25 +23,6 @@ module Rectangle = Primitives.Rectangle
 open Types
 
 (*a Useful functions *)
-(*m LayoutElementBase - included in all LayoutElementType *)
-module LayoutElementBase = struct
-  let styles = Stylesheet.Value.[ (Attr_names.classes, St_token_list,  sv_none_token_list, false);
-                                  (Attr_names.eval,    St_string,      sv_none_string, false);
-                                  (Attr_names.padding,      (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
-                                  (Attr_names.margin,       (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
-                                  (Attr_names.border,       (St_floats 4),  Sv_floats (4,[|0.;0.;0.;0.;|]), false);
-                                  (Attr_names.anchor,       (St_floats 2),  Sv_floats (2,[|0.5;0.5;|]), false);
-                                  (Attr_names.expand,       (St_floats 2),  Sv_floats (2,[|0.;0.;|]), false);
-                                  (Attr_names.place,        (St_floats 2),  sv_none_floats, false);
-                                  (Attr_names.grid,         (St_ints 4),    sv_none_ints, false);
-                                  (Attr_names.rotation,     St_float,       sv_none_float, false);
-                                  (Attr_names.scale,        (St_floats 2),  sv_none_floats, false);
-                                  (Attr_names.border_color, St_rgb,         sv_none_rgb, true); (* inherit *)
-                                  (Attr_names.fill_color,   St_rgb,         sv_none_rgb, true); (* inherit *)
-    ]
-
-end
-
 (*m LayoutElementFunc - create LayoutElement for aggregate from a LayoutElementType *)
 module LayoutElementFunc (E:LayoutElementType) = struct
   type et = E.et
