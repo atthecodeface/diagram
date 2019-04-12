@@ -138,7 +138,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       List.iter (pp_geometry ppf) gt.content_gt;
       pp_close ppf ()
 
-    (*v Stylesheet - one for the whole document, not every element *)
+    (*v create_stylesheet : unit -> t_stylesheet - performed once for the whole document, not every element *)
     let create_stylesheet _ = 
       let stylesheet = Stylesheet.create () in
       Stylesheet.add_style_defaults stylesheet LE.styles;
