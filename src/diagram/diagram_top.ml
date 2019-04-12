@@ -24,22 +24,22 @@ let main () =
     (* let sdoc = (`String (0,diag_test)) in *)
     let sdoc = (`Channel (open_in "examples/eval.dml")) in
     let page_bbox = (1.,1.,110.,150.) in
-    let stylesheet = Element.create_stylesheet () in
+    let stylesheet = create_stylesheet () in
     (*let b = from_structured_doc (`String (0,diag_test)) in*)
     let b = from_structured_doc sdoc in
     Format.(pp_set_mark_tags std_formatter true);
-    Element.pp_element Format.std_formatter b ;
+    pp_element Format.std_formatter b ;
     Format.print_flush ();
     Printf.printf "\n";
-    let gt = Element.layout_elements stylesheet page_bbox b in
+    let gt = layout_elements stylesheet page_bbox b in
 
-    Element.pp_geometry Format.std_formatter gt ;
+    pp_geometry Format.std_formatter gt ;
     Format.print_flush ();
     Printf.printf "\n";
 
-    Element.show_layout gt "";
+    show_layout gt "";
     let oc = open_out "a.svg" in
-    let svg = Svg.svg_doc (Element.render_svg gt 0) page_bbox in
+    let svg = Svg.svg_doc (render_svg gt 0) page_bbox in
     Svg.svg_print_hdr oc;
     Svg.pretty_print oc svg;
     close_out oc;
