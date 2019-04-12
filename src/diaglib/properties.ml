@@ -17,6 +17,8 @@
  *
  *)
 open Primitives
+open Types
+
 exception Invalid_property of string
 type t_ = | Padding_
           | Border_
@@ -28,15 +30,15 @@ type t_ = | Padding_
           | Anchor_
           | Grid_
 
-type t = | Padding      of Primitives.t_rect
-         | Border       of Primitives.t_rect
+type t = | Padding      of t_rect
+         | Border       of t_rect
          | FillColor    of Color.t
          | BorderColor  of Color.t
          | BorderStroke of Stroke.t
-         | Margin       of Primitives.t_rect
-         | Place        of Primitives.t_vector option
-         | Anchor       of Primitives.t_vector
-         | Grid         of Primitives.t_int4 option
+         | Margin       of t_rect
+         | Place        of t_vector option
+         | Anchor       of t_vector
+         | Grid         of t_int4 option
 
 let property_num t = 
   match t with 

@@ -17,7 +17,9 @@
  *
  *)
 
+open Types
 open Primitives
+
 (*m Grid *)
 module Grid = struct
   (*t t - structure for a grid - a list of start, span, and height of each cell *)
@@ -128,12 +130,12 @@ end
 (*m Top level of Layout *)
 (*t t_layout_properties *)
 type t_layout_properties = {
-        padding        : Primitives.t_rect;
-        border         : Primitives.t_rect;
-        margin         : Primitives.t_rect;
-        place          : Primitives.t_vector option; (* If placed this is where anchor * bbox is placed*)
-        anchor         : Primitives.t_vector; (* If placed, where in bbox the place point is; if grid, where in cell bbox to place bbox *)
-        grid           : Primitives.t_int4 option;   (* grid elements to cover w=1, h=1 are a single cell *)
+        padding        : t_rect;
+        border         : t_rect;
+        margin         : t_rect;
+        place          : t_vector option; (* If placed this is where anchor * bbox is placed*)
+        anchor         : t_vector; (* If placed, where in bbox the place point is; if grid, where in cell bbox to place bbox *)
+        grid           : t_int4 option;   (* grid elements to cover w=1, h=1 are a single cell *)
         fill_color     : Primitives.Color.t;
         border_color   : Primitives.Color.t;
        (* 
@@ -226,7 +228,7 @@ type t = {
     bbox : float * float;
   }
 let make cp_bbox_list index =
-  let f acc ((cp,bbox) : (t_layout_properties * Primitives.t_rect))  =
+  let f acc ((cp,bbox) : (t_layout_properties * t_rect))  =
     if is_placed cp then (
       let (w, h) = Primitives.Rectangle.get_wh bbox in
       let p = match (cp.place,index) with | (None,_) -> 0. | (Some(x,y),0) -> x | (Some(x,y),_) -> y in
@@ -249,18 +251,18 @@ type t = {
     props  : t_layout_properties;
     grids  : GridDimension.t list;
     places : PlaceDimension.t list;
-    min_bbox : Primitives.t_rect;
+    min_bbox : t_rect;
   }
 
 type t_transform = {
-translate : Primitives.t_vector;
-scale     : Primitives.t_vector;
-bbox      : Primitives.t_rect; (* bounding box to be displayed in - do border/fill of this *)
+translate : t_vector;
+scale     : t_vector;
+bbox      : t_rect; (* bounding box to be displayed in - do border/fill of this *)
   }
 let default_translate = (0.,0.)
 let default_scale     = (1.,1.)
 let create props children_props_bbox =
-  let build_grid_data acc ((cp,bbox) : (t_layout_properties * Primitives.t_rect))  =
+  let build_grid_data acc ((cp,bbox) : (t_layout_properties * t_rect))  =
     if (is_placed cp) then acc else (
         let (cs,rs,cw,rw) = (match cp.grid with | None->(0,0,0,0) | Some x->x) in
         let (w, h) = Primitives.Rectangle.get_wh bbox in

@@ -22,24 +22,26 @@ module Color     = Primitives.Color
 module Rectangle = Primitives.Rectangle
 open Types
 
-(*m ElementFunc - create the actual Element from a LayoutElementAggrType *)
-module ElementFunc (LE : LayoutElementAggrType) = struct
-    exception Eval_error of string
-
-    (*t th - Basic header *)
-    type th = Primitives.t_hdr
-
+(*m BaseFunc *)
+module BaseFunc (LE : LayoutElementAggrType) = struct
     (*t et - Element type, with its header and content *)
     type et = {
-        th : th;
+        th : t_hdr;
         properties: (string * string) list;
         et : LE.et;
         content_et : et list;
       }
 
+end
+
+(*m ElementFunc - create the actual Element from a LayoutElementAggrType *)
+module ElementFunc (LE : LayoutElementAggrType) = struct
+    exception Eval_error of string
+    include BaseFunc(LE)
+
     (*t st - Styleable element type; something to which stylesheet may be applied *)
     type st = {
-        th : th;
+        th : t_hdr;
         et : LE.et;
         styleable  : Stylesheet.t_styleable;
         content_st : st list;
@@ -47,7 +49,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
 
     (*t rt - Resolved styled element type; all properties of this have full values *)
     type rt = {
-        th : th;
+        th : t_hdr;
         rt : LE.rt;
         properties : (string * t_element_value) list;
         layout_properties  : Layout.t_layout_properties;
@@ -57,38 +59,38 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
 
     (*t etb - Bounded-box element type; resolved and desired geometry calculated *)
     type etb = {
-        th : th;
+        th : t_hdr;
         rt : LE.rt;
         properties : (string * t_element_value) list;
         layout_properties  : Layout.t_layout_properties;
         eval : Eval.t_eval;
-        content_bbox : Primitives.t_rect;
-        element_bbox : Primitives.t_rect;
-        min_bbox     : Primitives.t_rect;
+        content_bbox : t_rect;
+        element_bbox : t_rect;
+        min_bbox     : t_rect;
         layout       : Layout.t;
         content_etb  : etb list;
       }
 
     (*t lt - Post-layout element type; actual bounding box and content post-layout *)
     type lt = {
-        th : th;
+        th : t_hdr;
         lt : LE.lt;
         properties : (string * t_element_value) list;
         layout : Layout.t;
         ltr    : Layout.t_transform;
         eval : Eval.t_eval;
         content_lt : lt list;
-        bbox : Primitives.t_rect;
+        bbox : t_rect;
       }
 
     (*t gt - Fully resolved geometry type with evaluations completed *)
     type gt = {
-        th : th;
+        th : t_hdr;
         gt : LE.gt;
         layout : Layout.t;
         ltr    : Layout.t_transform;
         content_gt : gt list;
-        bbox : Primitives.t_rect;
+        bbox : t_rect;
       }
 
     (*f pp_attr *)
@@ -97,7 +99,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       ()
 
     (*f pp_open *)
-    let pp_open ppf name (th:th) =
+    let pp_open ppf name (th:t_hdr) =
       Format.pp_open_tag ppf name ;
       let id = th.id in
       pp_attr ppf "id" id;

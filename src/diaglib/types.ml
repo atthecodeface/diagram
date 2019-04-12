@@ -1,3 +1,23 @@
+
+type t_id = int
+type t_int4 = int * int * int * int
+type t_rect = float * float * float * float
+type t_vector = float * float
+type t_value = | Scalar of float
+               | Rect of t_rect
+               | Int4 of t_int4
+               | Vector of t_vector
+               | String of string
+
+(*t th - Basic header *)
+type t_hdr = {
+    int_id : t_id;
+    mutable parent : t_id;
+    id : string;
+  }
+type t_expr_resolver = t_hdr -> t_value
+
+
 (*t t_style_resolver *)
 type t_style_resolver = {
    value_as_float        : ?default:float -> string -> float;
@@ -8,7 +28,7 @@ type t_style_resolver = {
 
 (*t t_element_value *)
 type t_element_value =
-  | Ev_rect       of Primitives.t_rect
+  | Ev_rect       of t_rect
   | Ev_floats     of int * (float array)
   | Ev_float      of float
   | Ev_vector     of float * float
@@ -25,8 +45,8 @@ module type LayoutElementType = sig
 
     val styles       : (string * Stylesheet.Value.t_styleable_type * Stylesheet.Value.t_styleable_value * bool) list
     val resolve_styles : et -> t_style_resolver -> (rt * t_element_properties)
-    val get_min_bbox : et -> rt -> Primitives.t_rect
-    val make_layout_within_bbox : et -> rt -> Primitives.t_rect -> (lt * t_element_properties)
+    val get_min_bbox : et -> rt -> t_rect
+    val make_layout_within_bbox : et -> rt -> t_rect -> (lt * t_element_properties)
     val finalize_geometry : et -> rt -> lt -> t_style_resolver -> gt
     val render_svg   : et -> rt -> lt -> gt -> int -> Svg.t list
 end
@@ -45,8 +65,8 @@ module type LayoutElementAggrType = sig
     val type_name_lt  : lt -> string
     val type_name_gt  : gt -> string
     val resolve_styles : et -> t_style_resolver -> (rt * t_element_properties)
-    val get_min_bbox : rt -> Primitives.t_rect
-    val make_layout_within_bbox : rt -> Primitives.t_rect -> (lt * t_element_properties)
+    val get_min_bbox : rt -> t_rect
+    val make_layout_within_bbox : rt -> t_rect -> (lt * t_element_properties)
     val finalize_geometry : lt -> t_style_resolver -> gt
     val render_svg   : gt -> int -> Svg.t list
 end

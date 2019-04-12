@@ -80,7 +80,7 @@ module DiagramElement = struct
     | RPath (e,r)      -> Path.get_min_bbox e r
     | RBox  (e,r)      -> Box.get_min_bbox  e r
 
-  let make_layout_within_bbox rt (bbox : Primitives.t_rect) = 
+  let make_layout_within_bbox rt (bbox : t_rect) = 
     match rt with
     | RText (e,r)  -> let (l,pl) = Text.make_layout_within_bbox e r bbox in (LText (e,r,l), pl)
     | RPath (e,r)  -> let (l,pl) = Path.make_layout_within_bbox e r bbox in (LPath (e,r,l), pl)

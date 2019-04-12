@@ -10,7 +10,7 @@ type rt = {
     size  : float;
   (* anchor / alignment *)
   }
-type lt = Primitives.t_rect (* Rectangle to place text within *)
+type lt = t_rect (* Rectangle to place text within *)
 type gt = {
     size  : float;
     color : string;

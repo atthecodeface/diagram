@@ -47,22 +47,8 @@ module Stroke = struct
 end
 
 exception Invalid_value of string
-type t_id = int
-type t_hdr = {
-    int_id : t_id;
-    mutable parent : t_id;
-    id : string;
-  }
-type t_int4 = int * int * int * int
-type t_rect = float * float * float * float
-type t_vector = float * float
-type t_value = | Scalar of float
-               | Rect of t_rect
-               | Int4 of t_int4
-               | Vector of t_vector
-               | String of string
 
-type t_expr_resolver = t_hdr -> t_value
+open Types
 
 let th_svg_attr th al = (Svg.attribute_string "id" th.id) :: al
 let th_make id =

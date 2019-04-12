@@ -2,7 +2,7 @@ open Types
 include De_base
 type et = int
 type rt = {color:string;}
-type lt = Primitives.t_rect
+type lt = t_rect
 type gt = {
     coords : float array;
   }
