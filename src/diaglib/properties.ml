@@ -29,6 +29,8 @@ type t_ = | Padding_
           | Place_
           | Anchor_
           | Grid_
+          | Width_
+          | Height_
 
 type t = | Padding      of t_rect
          | Border       of t_rect
@@ -39,6 +41,8 @@ type t = | Padding      of t_rect
          | Place        of t_vector option
          | Anchor       of t_vector
          | Grid         of t_int4 option
+         | Width        of t_vector option
+         | Height       of t_vector option
 
 let property_num t = 
   match t with 
@@ -51,6 +55,8 @@ let property_num t =
   | Place _        -> Place_
   | Anchor _       -> Anchor_
   | Grid _         -> Grid_
+  | Width _        -> Width_
+  | Height _       -> Height_
 
 let is_property t pn = (property_num t)==pn
 
@@ -60,6 +66,8 @@ let replace_if_is_property t pn default : t =
 let replace_if_is_property_vector t pn default =
   match t with 
   | Place v        -> if (pn==Place_)       then v else default
+  | Width v        -> if (pn==Width_)       then v else default
+  | Height v       -> if (pn==Height_)      then v else default
   | _ -> default
 
 let replace_if_is_property_rect t pn default =

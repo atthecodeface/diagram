@@ -11,11 +11,16 @@ let rotation = "rotation"
 let scale = "scale"
 let border_color = "border_color"
 let fill_color = "fill_color"
+let align = "align"
+let anchor = "anchor"
 
 let coords="coords"
 let width="width"
 let height="height"
 let color="color"
+
+let stroke_width="stroke_width"
+let font_name="font_name"
 let font_size="font_size"
 
 let bbox="bbox"

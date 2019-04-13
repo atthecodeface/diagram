@@ -6,6 +6,7 @@
   (libraries (
     eval
     stylesheet
+    stylesheet_ml
     structured_doc
     batteries
   ))

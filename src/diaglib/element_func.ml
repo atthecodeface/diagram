@@ -57,7 +57,7 @@ let properties_value_as_floats = properties_value Element_value.as_floats
 (*f get_eval_value_from_properties pl -> s -> Eval.t option *)
 let get_eval_value_from_properties = properties_value Element_value.eval_value_of
 
-(*a Types *)
+(*a Types - through a functo so it can be used in the submodules  *)
 module TypeFunc(LE : LayoutElementAggrType) = struct
   (*t t_base - Element type, with its header and content *)
   type t_base = {
@@ -108,7 +108,8 @@ module TypeFunc(LE : LayoutElementAggrType) = struct
       ltr    : Layout.t_transform;
       eval : Eval.t_eval;
       content_lt : t_layout list;
-      bbox : t_rect;
+      bbox : t_rect; (* for the thing *)
+      content_bbox : t_rect; (* For all the content_lt if there are any *)
     }
 
   (*t t_finalized_geometry - Fully resolved geometry type with evaluations completed *)
@@ -217,12 +218,11 @@ module DesiredGeometryFunc (LE : LayoutElementAggrType) = struct
   (*f pp *)
   let rec pp ppf (etb:t) =
     pp_open ppf (LE.type_name_rt etb.rt) etb.th;
-    Format.fprintf ppf "ele_bbox:%s" (Rectangle.str etb.element_bbox);
-    Format.fprintf ppf "cont_bbox:%s" (Rectangle.str etb.content_bbox);
-    Format.fprintf ppf "min_bbox:%s" (Rectangle.str etb.min_bbox);
+    Format.fprintf ppf "ele_bbox:%s " (Rectangle.str etb.element_bbox);
+    Format.fprintf ppf "cont_bbox:%s " (Rectangle.str etb.content_bbox);
+    Format.fprintf ppf "min_bbox:%s " (Rectangle.str etb.min_bbox);
     List.iter (pp ppf) etb.content_etb;
     pp_close ppf ()
-
 
 end
 
@@ -233,7 +233,7 @@ module LayoutFunc (LE : LayoutElementAggrType) = struct
 
   (*f make_layout_within_bbox - make lt from etb *)
   let rec make_layout_within_bbox (etb:Types.t_desired_geometry) bbox : t= 
-    let (ltr, bbox) = Layout.layout_within_bbox etb.layout bbox in
+    let (ltr, content_bbox) = Layout.layout_within_bbox etb.layout bbox in
     let (lt, properties) = LE.make_layout_within_bbox etb.rt bbox in
     let layout_content_element (x : Types.t_desired_geometry) =
       let bbox = Layout.get_bbox_element etb.layout ltr x.layout_properties x.min_bbox in
@@ -241,7 +241,7 @@ module LayoutFunc (LE : LayoutElementAggrType) = struct
     in
     let content_lt = List.map layout_content_element etb.content_etb in
     let properties = properties @ etb.properties in
-    { th=etb.th; lt; properties; eval=etb.eval; layout=etb.layout; ltr; content_lt; bbox;}
+    { th=etb.th; lt; properties; eval=etb.eval; layout=etb.layout; ltr; content_lt; bbox; content_bbox}
 
   (*f pp *)
   let rec pp ppf (lt:t) =

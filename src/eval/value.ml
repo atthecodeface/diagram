@@ -159,7 +159,7 @@ let subscript i = function
   | Subarray (s,n,arr) when ((i>=0) && (i<n)) ->
      arr.(s+i)
   | Subarray (_,n,_) -> raise (Invalid_subscript (Printf.sprintf "index %d max %d" i n))
-  | _ -> raise (Bad_type "For subscript")
+  | tr -> raise (Bad_type (Printf.sprintf "For subscript (got %s)" (str_type tr)))
 
 (*f slice int -> int -> t -> t *)
 let slice i0 i1 = function

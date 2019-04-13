@@ -20,6 +20,7 @@
 open Types
 open Primitives
 
+(*a Grid and place modules *)
 (*m Grid *)
 module Grid = struct
   (*t t - structure for a grid - a list of start, span, and height of each cell *)
@@ -32,7 +33,7 @@ module Grid = struct
   let sort_by_start_index cell_data =
     List.sort (fun (s0,_,_) (s1,_,_) -> compare s0 s1) cell_data
 
-  (*f find_min_height - find the shortest height in celL_data starting
+  (*f find_min_size - find the shortest height in cell_data starting
     at the specified row;
     
     If there are any cells that start at a row
@@ -45,15 +46,16 @@ module Grid = struct
     then.
 
   *)
-  let find_min_height cell_data first_row =
+  let find_min_size cell_data first_row =
     let acc_if_smaller acc (s0,h0,size) =
       let (min_height, current_next) = acc in
+      (* Printf.printf "acc_if_smaller %d %f %d %d %d %f\n" first_row min_height current_next s0 h0 size; *)
       if ((s0 > first_row) && (s0 < current_next)) then
         (0., s0)
       else if (s0==first_row) && (s0+h0<current_next) then
         (size, s0+h0)
       else if (s0==first_row) && (s0+h0==current_next) && (size>min_height) then
-        (min_height, current_next)
+        (size, current_next)
       else
         acc
     in
@@ -86,10 +88,13 @@ module Grid = struct
 
    *)
   let rec find_next_row_position acc sd first_row current_posn =
+    (*
     List.iter (fun (s,h,size) -> Printf.printf "Row %d span %d size %f\n" s h size) sd;
     Printf.printf "\n";
+     *)
     if (List.length sd)==0 then acc else (
-      let (size, next_row) = find_min_height sd first_row in
+      let (size, next_row) = find_min_size sd first_row in
+      (* Printf.printf "find_min_size %d returned %f %d\n" first_row size next_row; *)
       let posn = current_posn +. size in
       let sd = remove_rows sd first_row next_row size in
       let acc = (next_row, posn)::acc in
@@ -125,6 +130,13 @@ module Grid = struct
   (*f get_position t i *)
   let get_position t i =
     List.fold_left (fun r (x,p) -> (if (i>=x) then p else r)) 0. t.positions
+  (*f str *)
+  let str t = 
+    let str_cell_data = String.concat "\n" (List.map (fun (s,n,sz) -> Printf.sprintf "start %d num %d size %f" s n sz) t.cell_data) in
+    let str_positions = String.concat "\n" (List.map (fun (s,p) -> Printf.sprintf "start %d position %f" s p) t.positions) in
+    "Cell data:\n" ^ str_cell_data ^ "\nRev positions:\n" ^ str_positions
+
+  (*f All done *)
 end
 
 (*m Top level of Layout *)
@@ -133,7 +145,9 @@ type t_layout_properties = {
         padding        : t_rect;
         border         : t_rect;
         margin         : t_rect;
-        place          : t_vector option; (* If placed this is where anchor * bbox is placed*)
+        place          : t_vector option; (* If placed this is where anchor * bbox is placed *)
+        width          : t_vector option; (* If None then no min/max width; else min/max width *)
+        height         : t_vector option; (* If None then no min/max height; else min/max height *)
         anchor         : t_vector; (* If placed, where in bbox the place point is; if grid, where in cell bbox to place bbox *)
         grid           : t_int4 option;   (* grid elements to cover w=1, h=1 are a single cell *)
         fill_color     : Primitives.Color.t;
@@ -151,18 +165,29 @@ expand - if grid and space available > min space then weight of expansion in x o
 
 (*f make_layout_hdr stylesheet styleable - get actual data from the provided properties *)
 let make_layout_hdr stylesheet styleable =
-        let padding       = Properties.(get_property_rect   stylesheet styleable "padding") in
-        let border        = Properties.(get_property_rect   stylesheet styleable "border") in
-        let margin        = Properties.(get_property_rect   stylesheet styleable "margin") in
-        let place         = Properties.(get_property_vector_option stylesheet styleable "place") in
-        let anchor        = Properties.(get_property_vector stylesheet styleable "anchor") in
-        let grid          = Properties.(get_property_int4_option   stylesheet styleable "grid") in
-        let fill_color    = Properties.(get_property_color  stylesheet styleable "fill_color") in
-        let border_color  = Properties.(get_property_color  stylesheet styleable "border_color") in
+        let padding       = Properties.(get_property_rect   stylesheet styleable        Attr_names.padding) in
+        let border        = Properties.(get_property_rect   stylesheet styleable        Attr_names.border) in
+        let margin        = Properties.(get_property_rect   stylesheet styleable        Attr_names.margin) in
+        let place         = Properties.(get_property_vector_option stylesheet styleable Attr_names.place) in
+        let width         = Properties.(get_property_vector_option stylesheet styleable Attr_names.width) in
+        let height        = Properties.(get_property_vector_option stylesheet styleable Attr_names.height) in
+        let anchor        = Properties.(get_property_vector stylesheet styleable        Attr_names.anchor) in
+        let grid          = Properties.(get_property_int4_option   stylesheet styleable Attr_names.grid) in
+        let fill_color    = Properties.(get_property_color  stylesheet styleable        Attr_names.fill_color) in
+        let border_color  = Properties.(get_property_color  stylesheet styleable        Attr_names.border_color) in
 (* content_transform and content_inv_transform *)
 {
- padding; border; margin; place; anchor; grid; fill_color; border_color;
+ padding; border; margin; place; width; height; anchor; grid; fill_color; border_color;
 }
+
+(*f props_min_max *)
+let props_min_max mm_opt m =
+  match mm_opt with 
+  | None -> m
+  | Some (min, max) ->
+    let m = if (m<min) then min else m in
+    let m = if (m>max) then max else m in
+    m
 
 (*f is_placed *)
 let is_placed t = 
@@ -192,6 +217,7 @@ type t = {
 
 let make grid_cell_data =
     let grid = Grid.make grid_cell_data in
+    (* Printf.printf "Grid %s\n" (Grid.str grid); *)
     let find_first_last_index (f,l) (s,n,_) =
       let f = min s f in
       let l = max l (s+n) in
@@ -212,6 +238,7 @@ let make grid_cell_data =
     {grid; expand_default; expand_total; expand}
 let get_span t = (0., Grid.get_last_position t.grid)
 let get_bbox t s n = (Grid.get_position t.grid s), (Grid.get_position t.grid (s+n))
+let str t = Grid.str t.grid
 end
 
 (*m PlaceDimension
@@ -247,6 +274,8 @@ let make cp_bbox_list index =
   let get_span t = t.bbox
 end
 
+(*a Types *)
+(*t t *)
 type t = {
     props  : t_layout_properties;
     grids  : GridDimension.t list;
@@ -254,13 +283,22 @@ type t = {
     min_bbox : t_rect;
   }
 
+(*t t_transform *)
 type t_transform = {
 translate : t_vector;
 scale     : t_vector;
 bbox      : t_rect; (* bounding box to be displayed in - do border/fill of this *)
   }
+
+(*a Toplevel Layout module *)
 let default_translate = (0.,0.)
 let default_scale     = (1.,1.)
+
+(*f create : t_layout_properties -> (t_layout_properties * min_bbox) list -> t
+
+  Create the appropriate layout for the content (not this element) and determine the min_bbox given properties of this
+  and the properties and min_bbox of contents
+ *)
 let create props children_props_bbox =
   let build_grid_data acc ((cp,bbox) : (t_layout_properties * t_rect))  =
     if (is_placed cp) then acc else (
@@ -278,8 +316,13 @@ let create props children_props_bbox =
   let (glx,grx) = List.hd  grid_spans in    
   let (gby,gty) = List.nth grid_spans 1 in    
   let (plx,prx) = List.hd  place_spans in    
-  let (pby,pty) = List.nth place_spans 1 in    
+  let (pby,pty) = List.nth place_spans 1 in
+  Printf.printf "grid bbox %f,%f,%f,%f place bbox %f,%f,%f,%f\n" glx gby grx gty plx pby prx pty;
   let min_bbox = Primitives.Rectangle.union (glx,gby,grx,gty) (plx,pby,prx,pty) in
+  let (mcx,mcy,mw,mh) = Primitives.Rectangle.get_cwh min_bbox in
+  let mw = props_min_max props.width  mw in
+  let mh = props_min_max props.height mh in
+  let min_bbox = Primitives.Rectangle.of_cwh (mcx, mcy, mw, mh) in
   {props; grids; places; min_bbox;}
 
 (*f get_min_bbox - get the minimum bbox required by the content given grid and placemet (previously created as t) *)
@@ -299,13 +342,11 @@ shrink content bbox by padding/border/margin?
  *)
 let layout_within_bbox t bbox = 
     let internal_bbox = Primitives.Rectangle.(shrink (shrink (shrink bbox t.props.margin) t.props.border) t.props.padding) in
-    Printf.printf "Bbox %s int bbox %s\n" (Primitives.Rectangle.str bbox) (Primitives.Rectangle.str t.min_bbox);
     (* dcx,dcy , dw,dh is center/size of the bbox to layout in after margin reduction *)
     let (dcx,dcy,dw,dh) = Primitives.Rectangle.get_cwh internal_bbox in
     (* ccx,ccy , cw,ch is center/size of the min bbox for our contents *)
-    (* let (ccx,ccy,cw,ch) = Primitives.Rectangle.get_cwh t.min_bbox in *)
+    let (ccx,ccy,cw,ch) = Primitives.Rectangle.get_cwh t.min_bbox in
     (* should determine content layout w/h - assume same as now - but could expand it *)
-    let (cw,ch) = (dw,dh) in
     (* So spare space can be determined - presumably +ve *)
     let (slack_x,slack_y) = ((dw-.cw),(dh-.ch)) in
     (* adjust ccx and ccy appropriately - depends on anchor coord *)
@@ -314,10 +355,11 @@ let layout_within_bbox t bbox =
     (*  *)
     let ccx = dcx +. slack_x *. ax in
     let ccy = dcy +. slack_y *. ay in
-    let content_bbox = (ccx-.cw/.2., ccy-.ch/.2., ccx+.cw/.2., ccy+.ch/.2.) in
+    let content_bbox = Primitives.Rectangle.of_cwh (ccx,ccy,cw,ch) in
     let translate = default_translate in
     let scale     = default_scale in
     let transform = {translate; scale; bbox;} in (* bbox is used for the border generation *)
+    Printf.printf "Layout_within_bbox %s int bbox %s min bbox %s slack %f,%f returns content %s \n" (Primitives.Rectangle.str bbox) (Primitives.Rectangle.str internal_bbox) (Primitives.Rectangle.str t.min_bbox) slack_x slack_y (Primitives.Rectangle.str content_bbox);
     (transform, content_bbox)
 
 let get_bbox_element t tr cp min_bbox = 
@@ -345,7 +387,7 @@ let add_transform_tag tr tags =
     (Svg.attribute_string "transform" (String.concat " " [t; s])) :: tags
 
 let svg_border_path_coords t tr =
-  let (x0,y0,x1,y1) = Rectangle.(shrink (shrink ~scale:(0.5) tr.bbox t.props.margin) t.props.border)  in
+  let (x0,y0,x1,y1) = Rectangle.(shrink ~scale:(0.5) (shrink tr.bbox t.props.margin) t.props.border)  in
   let path_string = Printf.sprintf "M%f %f L%f %f L%f %f L%f %f Z" x0 y0 x1 y0 x1 y1 x0 y1 in
   Svg.attribute_string "d" path_string
 
@@ -364,7 +406,7 @@ let svg_append_border t tr s =
   let (bw,_,_,_) = t.props.border in
   if (Color.is_none t.props.border_color) then s else 
     let stroke = Color.svg_attr "stroke" t.props.border_color in
-    let stroke_width = Svg.attribute_string "stroke-width" (Printf.sprintf "%f" (bw/.2.)) in
+    let stroke_width = Svg.attribute_string "stroke-width" (Printf.sprintf "%f" bw) in
     let fill   = Svg.attribute_string "fill" "none" in
     let path = Svg.tag "path" [stroke; fill; stroke_width; coords] [] [] in
     s @ [path]

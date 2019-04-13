@@ -52,7 +52,6 @@ exception Bad_tag of string
 open Structured_doc
 
 let from_structured_doc f =
-  let fnt = Font.make  "Arial embedded" 10. 3. 5. in
   let rec read_element_contents opt_nsn_att data rev_acc t =
     match (input t) with
     | `El_start ((ns,name),attrs) -> (
@@ -69,7 +68,7 @@ let from_structured_doc f =
              if (String.equal name "box") then (
                Diagram_element.make_box attrs contents
              ) else if (String.equal name "text") then (
-               Diagram_element.make_text attrs (De_text.make fnt data)
+               Diagram_element.make_text attrs (De_text.make data)
              ) else if (String.equal name "path") then (
                Diagram_element.make_path attrs (De_path.make ())
              ) else (

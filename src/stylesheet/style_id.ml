@@ -33,7 +33,7 @@ end
 (*m Style_ids - immutable, but contains a hash table of Style_id_hash.t -> Style_id.t *)
 module Style_ids = struct
   exception Unknown_id of string
-  exception Duplicate_id
+  exception Duplicate_id of string
   let create _ =
     {
       set = Hashtbl.create 1024;
@@ -43,18 +43,27 @@ module Style_ids = struct
       Some (Hashtbl.find t.set hash)
     else
       None
-  let find_id_exn hash t =
+
+  let find_id_exn s t =
+    let hash = Style_id.hash_of_string s in
     match find_opt_id hash t with
-      None -> raise (Unknown_id "hashed thing")
+      None -> raise (Unknown_id (Printf.sprintf "could not find style name '%s'" s))
     | Some sid -> sid
+
   let add_id hash sid t =
     if (Hashtbl.mem t.set hash) then
       false
     else
       (Hashtbl.replace t.set hash sid; true)
+
+  let add_id_exn s sid t =
+    let hash = Style_id.hash_of_string s in
+    match add_id hash sid t with
+    | false -> raise (Duplicate_id (Printf.sprintf "style '%s' already registered" s))
+    | _ -> ()
+
   let build_id_value_list nvs t = 
-    let rec add_id_value acc n_x = 
-      let (name,x)=n_x in
+    let rec add_id_value acc (name,x) = 
       let hash = Style_id.hash_of_string name in
       let opt_sid = find_opt_id hash t in
       match opt_sid with

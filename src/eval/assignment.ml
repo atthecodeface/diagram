@@ -78,6 +78,7 @@ let build_from_tokens (tl:Token.t_with_pos list) =
 
 (*f value_of rfn -> t -> Value.t; raise exception if loop in resolution *)
 let value_of rfn a =
+  Printf.printf "Assign.value_of %s\n" a.lvalue;
   if a.in_eval then raise (Recursive_evaluation a) else
     match a.value with
     | Some f -> f

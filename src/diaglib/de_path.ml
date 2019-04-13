@@ -1,7 +1,7 @@
 open Types
 include De_base
 type et = int
-type rt = {color:string;}
+type rt = {color:string; stroke_width:float;}
 type lt = t_rect
 type gt = {
     coords : float array;
@@ -11,12 +11,13 @@ let make _ = 0
 let styles = Stylesheet.Value.[
                (Attr_names.coords,  St_float_arr, sv_none_float_arr, true);
                (Attr_names.color,   St_rgb,       Sv_rgb [|0.;0.;0.;|], true);
-               (Attr_names.width,   St_float,     Sv_float (Some 1.), true);
+               (Attr_names.stroke_width,   St_float,     Sv_float (Some 1.), true);
              ] @ styles
 let resolve_styles et (resolver:t_style_resolver) = 
-  let color = resolver.value_as_color_string  Attr_names.color in
-  let coords = resolver.value_as_floats ~default:[||] Attr_names.coords in
-  let rt : rt = {color} in
+  let stroke_width = resolver.value_as_float  Attr_names.stroke_width in
+  let color        = resolver.value_as_color_string  Attr_names.color in
+  let coords       = resolver.value_as_floats ~default:[||] Attr_names.coords in
+  let rt : rt = {color; stroke_width;} in
   (rt, [Attr_names.coords,Ev_floats ((Array.length coords),coords)])
 
 let r = Primitives.Rectangle.mk_fixed (0.,0.,100.,20.)
@@ -34,7 +35,7 @@ let render_svg et rt lt gt i =
   in
   let n = Array.length gt.coords in
   let path = make_path "" "M" 0 n in
-  [ Svg.(tag "path" [ FloatAttr("stroke-width", 1.0);
+  [ Svg.(tag "path" [ FloatAttr("stroke-width", rt.stroke_width);
                       StringAttr("stroke", rt.color);
                       StringAttr("fill", "none");
                       StringAttr("d", path);

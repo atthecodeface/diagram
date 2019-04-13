@@ -67,6 +67,7 @@ let functions =  [
     {name = "len";  fn = unary_value_fn (fun s -> Value.(of_int (size s))) };
     {name = "dup";  fn = unary_stack_value_fn (fun s v -> Stack.push_value s v; v) };
     {name = "swap";  fn = binary_stack_value_fn (fun s v0 v1 -> Stack.push_value s v1; v0) };
+    {name = "debug"; fn = (fun s -> Printf.printf "stack : %s\n" (Value.str (Stack.as_value s))) };
   ]
 
 (*f find_fn string -> eq_fn option *)

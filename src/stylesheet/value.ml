@@ -298,7 +298,7 @@ let as_color_string ?default svalue =
       match default with | Some s -> s | None -> raise (Bad_value "No default value provided when getting value as_color_string")
     ) else (
       match svalue with
-      | Sv_rgb     f    -> sfmt "%f %f %f" f.(0) f.(1) f.(2)
+      | Sv_rgb     f    -> sfmt "Rgb(%d,%d,%d)" (int_of_float (255.*.f.(0))) (int_of_float (255.*.f.(1))) (int_of_float (255.*.f.(2)))
       | _               -> "''"
     )
   )

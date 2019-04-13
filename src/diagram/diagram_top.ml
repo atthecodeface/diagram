@@ -22,9 +22,25 @@ open Diaglib
 
 let main () =
     (* let sdoc = (`String (0,diag_test)) in *)
-    let sdoc = (`Channel (open_in "examples/eval.dml")) in
-    let page_bbox = (1.,1.,110.,150.) in
+    let sdoc = (`Channel (open_in "examples/pipeline.dml")) in
+    let dss = (`Channel (open_in "examples/pipeline.dss")) in
     let stylesheet = create_stylesheet () in
+    Stylesheet_ml.stylesheet_add_rules stylesheet dss;
+    let page_bbox = (1.,1.,110.,150.) in
+    let sel_pipe_stage = Stylesheet.se_has_element_class "pipe_stage" in
+    let sel_pipe_gap = Stylesheet.se_has_element_class "pipe_gap" in
+    Stylesheet.add_style_rule stylesheet [sel_pipe_stage;]
+             [("border_color", Sv_rgb [|0.5;0.5;0.5;|]);
+              ("border",       Sv_floats (4,[|0.5;0.5;0.5;0.5;|]));
+              ("padding",      Sv_floats (4,[|0.;0.;0.;0.;|]));
+              ("margin",      Sv_floats (4,[|0.;0.;0.;0.;|]));
+             ];
+    Stylesheet.add_style_rule stylesheet [sel_pipe_gap;]
+             [("height", Sv_floats (2,[|4.;4.;|]));
+              ("border",       Sv_floats (4,[|0.;0.;0.;0.;|]));
+              ("margin",      Sv_floats (4,[|0.;0.;0.;0.;|]));
+              ("padding",      Sv_floats (4,[|0.;0.;0.;0.;|]));
+             ];
     (*let b = from_structured_doc (`String (0,diag_test)) in*)
     let b = from_structured_doc sdoc in
     Format.(pp_set_mark_tags std_formatter true);

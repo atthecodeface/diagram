@@ -86,18 +86,21 @@ module Rectangle = struct
       | Uniform f -> (f,f,f,f)
       | Fixed r   -> r
       | Func f -> value_rect (f n)
-    let get_wh bbox_r =
-      let (d0,d1,d2,d3) = bbox_r in
+
+    let get_wh (d0,d1,d2,d3) =
       (d2-.d0, d3-.d1)
-    let get_width bbox_r =
-      let (d0,d1,d2,d3) = bbox_r in
+
+    let get_width (d0,_,d2,_) =
       d2-.d0
-    let get_height bbox_r =
-      let (d0,d1,d2,d3) = bbox_r in
+
+    let get_height (_,d1,_,d3) =
       d3-.d1
-    let get_cwh bbox_r =
-      let (d0,d1,d2,d3) = bbox_r in
+
+    let get_cwh (d0,d1,d2,d3) =
       ((d0+.d2)/.2., (d1+.d3)/.2., d2-.d0, d3-.d1)
+
+    let of_cwh (x,y,w,h) =
+      (x-.w/.2., y-.h/.2., x+.w/.2., y+.h/.2.)
    
     let str (a0,a1,a2,a3) = Printf.sprintf "(%f,%f,%f,%f)" a0 a1 a2 a3
 end
