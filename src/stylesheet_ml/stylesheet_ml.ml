@@ -50,6 +50,7 @@ let _ =
 (*a HML stuff *)
 exception Failed_to_parse of string
 exception Bad_tag of string
+exception Bad_attr of string * string * string
 open Structured_doc
 open Stylesheet
 module Rules = struct
@@ -60,18 +61,32 @@ type t_style = {
   }
 
 let rec str_style ?indent:(indent="") s =
-    let heading = Printf.sprintf "%sStyle %s:" indent s.id in
-    let styling_strings = List.map (fun (s,v) -> Printf.sprintf "%s  : %s=%s" indent s (Stylesheet.Value.str v)) s.styling in
-    let body_strings = List.map (str_style ~indent:(indent ^ "  ")) s.substyles in
-    String.concat "\n" (heading::(styling_strings @ body_strings))
+  let heading = Printf.sprintf "%sStyle %s:" indent s.id in
+  let styling_strings = List.map (fun (s,v) -> Printf.sprintf "%s  : %s=%s" indent s (Stylesheet.Value.str v)) s.styling in
+  let body_strings = List.map (str_style ~indent:(indent ^ "  ")) s.substyles in
+  String.concat "\n" (heading::(styling_strings @ body_strings))
 
-type t_rule = {
-    conditions : (string * string) list option; (* None for apply style *)
+type t_apply = {
     styles : string list; (* Style ids to apply *)
   }
 
-let str_rule r =
-    Printf.sprintf "Rule:"
+let str_apply ?indent:(indent="") r =
+  let heading = Printf.sprintf "%sApply:" indent in
+  String.concat " " (heading::r.styles)
+
+type t_rule = {
+    conditions : (string * string) list;
+    rules : t_rule list;
+    applies : t_apply list;
+  }
+
+let rec str_rule ?indent:(indent="") r =
+  let conditions_string = List.map (fun (n,v) -> Printf.sprintf "%s=%s" n v) r.conditions in
+  let heading = Printf.sprintf "%sRule:" indent in
+  let heading = String.concat " " (heading::conditions_string) in
+  let rules_strings   = List.map (str_rule ~indent:(indent ^ "  ")) r.rules in
+  let applies_strings = List.map (str_apply ~indent:(indent ^ "  ")) r.applies in
+  String.concat "\n" (heading::(rules_strings @ applies_strings))
 
 type t_ruleset = {
     styles : t_style list;
@@ -83,11 +98,12 @@ let str_ruleset rs =
   let str_rules = List.map str_rule rs.rules in
   String.concat "\n" ("Ruleset:" :: (str_styles @ str_rules))
 
-type t = | Style of t_style
-         | Rule of t_rule
-         | Ruleset of t_ruleset
+type t = | Style of t_style (* Top level, or child o style *)
+         | Apply of t_apply (* Top level, or child of rule *)
+         | Rule of t_rule (* Top level, or child of rule *)
+         | Ruleset of t_ruleset (* Top level only *)
 
-(*f make_style : stylesheet -> attrs -> contents -> t_style
+(*f make_style : stylesheet -> attrs -> contents -> t
 attrs allowed are id and styles
  *)
 let make_style stylesheet attrs contents = 
@@ -107,27 +123,55 @@ let make_style stylesheet attrs contents =
   let (id,styling) = List.fold_left add_stylings ("",[]) attrs in
   Style {id; substyles; styling;}
 
+(*f make_apply : attrs -> contents -> t
+attrs allowed are style; contents must be empty
+ *)
+let make_apply attrs contents = 
+  match contents with
+  | [] -> ( 
+    let find_styles acc (name,value) =
+      if String.equal name "style" then [value] else raise (Bad_attr ("apply",name,value))
+    in
+    (* Must have style= attribute only *)
+    let styles = List.fold_left find_styles [] attrs in
+    Apply {styles; }
+  )
+  | _ -> raise (Failed_to_parse "apply must not have children")
+
+(*f make_rule : attrs -> contents -> t
+attrs allowed are style
+ *)
+let make_rule attrs contents =
+  (* May have contents of rules or applies *)
+  let extract_rule_applies (rules,rev_applies) = function
+    | Apply a -> (rules,(a::rev_applies))
+    | Rule r -> ((r::rules),rev_applies)
+    | _ -> raise (Failed_to_parse "rule can only contain rule or apply children")
+  in
+  let (rules,rev_applies) = List.fold_left extract_rule_applies ([],[]) contents in
+  (* May have style= attribute *)
+  (* May have conditions as attr= (for id=, class=, tag=?) and subtree=0/1 *)
+  let add_applies_conditions (rev_applies,conditions) (name,value) =
+    if String.equal name "style" then (
+      let apply = {styles=[value]} in
+      (apply::rev_applies),conditions
+    ) else (
+      (rev_applies,(name,value)::conditions)
+    )
+  in
+  let (rev_applies,conditions) = List.fold_left add_applies_conditions (rev_applies,[]) attrs in
+  let applies = List.rev rev_applies in
+  Rule {conditions; rules; applies;}
+
 let make contents = 
   let styles = List.fold_left (fun acc -> function | Style s -> (s::acc) | _ -> acc) [] contents in
   let rules  = List.fold_left (fun acc -> function | Rule s -> (s::acc) | _ -> acc) [] contents in
   Ruleset {styles; rules;}
 
-let make_rule attrs contents =
-  (* May have style= attribute *)
-  (* May have conditions as attr= (for id=, class=, tag=?) and subtree=0/1 *)
-  let conditions = None in
-  let styles = ["fred"] in
-  Rule {conditions; styles}
-
-let make_apply attrs contents = 
-  (* Must have style= attribute only *)
-  let conditions = None in
-  let styles = ["fred"] in
-  Rule {conditions; styles}
-
 let str = function
   | Ruleset rs -> str_ruleset rs
   | Style   s  -> str_style s
+  | Apply   s  -> str_apply s
   | Rule    r  -> str_rule r
 end
 
