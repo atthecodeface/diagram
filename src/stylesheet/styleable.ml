@@ -52,15 +52,35 @@ let get_value_ref t sheet (s:string) =
 let get_value t sheet (s:string) =
   Value_ref.get_value (get_value_ref t sheet s)
 
-(*f is_element_id *)
-let is_element_id (s:string) t     =
-  (*Printf.printf "Is_Element_Id %s : %s\n" t.id_name s;*)
-  (t.id_name = s)
+(*f re_match_fn *)
+let re_match_fn re =
+  let re = Re.compile re in
+  fun x -> match Re.exec_opt re x with
+           | None -> false
+           | _ -> true
 
-(*f is_element_type *)
-let is_element_type (s:string) t   =
-  (*Printf.printf "Is_Element_Type %s : %s : %s\n" t.id_name s t.type_name;*)
-  (t.type_name = s)
+(*f match_of_string *)
+let match_of_string s =
+    let n = String.length s in
+    if (n==0) then `Equals (String.equal "")
+    else (
+      let starts_with_star = (String.get s 0)     = '*' in
+      let ends_with_star   = (String.get s (n-1)) = '*' in
+      match (starts_with_star, ends_with_star) with
+      | (false, false) -> `Equals (String.equal s)
+      | (true,  false) -> `Matches (re_match_fn Re.(seq [str (String.sub s 1 (n-1)); eos]))
+      | (true,  true)  -> `Matches (re_match_fn Re.(seq [str (String.sub s 1 (n-2))]))
+      | (false, true)  -> `Matches (re_match_fn Re.(seq [bos; str (String.sub s 0 (n-1))]))
+    )
+
+(*f match_element_id *)
+let match_element_id f t = f t.id_name
+
+(*f match_element_type *)
+let match_element_type f t = f t.type_name 
+
+(*f match_element_class *)
+let match_element_class f t = List.exists f t.classes
 
 (*f is_element_state *)
 let is_element_state state value t =
@@ -74,11 +94,6 @@ let is_element_state state value t =
 let set_element_state state value t =
   if (state>=(Array.length t.state)) then ()
   else (t.state.(state) <- value)
-
-(*f has_element_class *)
-let has_element_class (s:string) t =
-  (*Printf.printf "Has_Element_Class %s : %s : %d\n" t.id_name s (List.length t.classes);*)
-  (List.mem s t.classes) (* maybe not as this would use ==? *)
 
 (*f create *)
 let create desc sheet type_name name_values style_change_callback children =

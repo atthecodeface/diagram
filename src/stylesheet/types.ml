@@ -70,6 +70,8 @@ type t_styleable= {
 (*a Selectors and rules *)
 type t_style_selector = (t_styleable -> bool)
 
+type t_style_match = [ | `Equals of (string->bool) | `Matches of (string->bool) ]
+
 type t_style_change_fn = t_styleable -> unit (* internal apply style rule *)
 
 type t_style_rule = {

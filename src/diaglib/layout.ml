@@ -317,7 +317,7 @@ let create props children_props_bbox =
   let (gby,gty) = List.nth grid_spans 1 in    
   let (plx,prx) = List.hd  place_spans in    
   let (pby,pty) = List.nth place_spans 1 in
-  Printf.printf "grid bbox %f,%f,%f,%f place bbox %f,%f,%f,%f\n" glx gby grx gty plx pby prx pty;
+  (* Printf.printf "grid bbox %f,%f,%f,%f place bbox %f,%f,%f,%f\n" glx gby grx gty plx pby prx pty; *)
   let min_bbox = Primitives.Rectangle.union (glx,gby,grx,gty) (plx,pby,prx,pty) in
   let (mcx,mcy,mw,mh) = Primitives.Rectangle.get_cwh min_bbox in
   let mw = props_min_max props.width  mw in
@@ -359,7 +359,7 @@ let layout_within_bbox t bbox =
     let translate = default_translate in
     let scale     = default_scale in
     let transform = {translate; scale; bbox;} in (* bbox is used for the border generation *)
-    Printf.printf "Layout_within_bbox %s int bbox %s min bbox %s slack %f,%f returns content %s \n" (Primitives.Rectangle.str bbox) (Primitives.Rectangle.str internal_bbox) (Primitives.Rectangle.str t.min_bbox) slack_x slack_y (Primitives.Rectangle.str content_bbox);
+    (* Printf.printf "Layout_within_bbox %s int bbox %s min bbox %s slack %f,%f returns content %s \n" (Primitives.Rectangle.str bbox) (Primitives.Rectangle.str internal_bbox) (Primitives.Rectangle.str t.min_bbox) slack_x slack_y (Primitives.Rectangle.str content_bbox); *)
     (transform, content_bbox)
 
 let get_bbox_element t tr cp min_bbox = 
@@ -367,7 +367,7 @@ let get_bbox_element t tr cp min_bbox =
     let (cs,rs,cw,rw) = (match cp.grid with | None->(0,0,0,0) | Some x->x) in
     let (x0,x1) = GridDimension.get_bbox (List.hd t.grids) cs cw in
     let (y0,y1) = GridDimension.get_bbox (List.nth t.grids 1) rs rw in
-    Printf.printf "\nbbox for grid %f,%f, %f,%f, %d,%d,%d,%d\n" x0 y0 x1 y1 cs rs cw rw;
+    (* Printf.printf "\nbbox for grid %f,%f, %f,%f, %d,%d,%d,%d\n" x0 y0 x1 y1 cs rs cw rw; *)
     (x0,y0,x1,y1)
   )
 

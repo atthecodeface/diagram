@@ -52,7 +52,7 @@ let get_min_bbox et rt =
 
 let make_layout_within_bbox et rt bbox : lt * t_element_properties = 
   (* bbox is in the coordinate space for us to do a layout in  can now do centering, and could prepare for justification. *)
-  Printf.printf "\nText layout bbox %s\n\n" (Primitives.Rectangle.str bbox);
+  (* Printf.printf "\nText layout bbox %s\n\n" (Primitives.Rectangle.str bbox); *)
   (bbox, [])
 
 let finalize_geometry et (rt:rt) lt (resolver:t_style_resolver) = 
@@ -77,5 +77,6 @@ let render_line_svg et rt lt gt text (x,y) =
            StringAttr ("text-anchor", gt.text_anchor);
            StringAttr ("fill", gt.color);
          ] [] [text])
+
 let render_svg et rt lt gt i = 
   List.map2 (render_line_svg et rt lt gt) et.text gt.xys

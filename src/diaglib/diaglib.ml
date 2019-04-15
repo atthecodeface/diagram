@@ -18,35 +18,6 @@
  *)
 (*a Import modules *)
 
-(*a Stylesheet things *)
-(*
-let stylesheet = Element.create_stylesheet ()
-let sel_true            =  (fun e -> true)
-let sel_cbox            =  Stylesheet.se_is_element_id "control"
-let sel_type_button     =  Stylesheet.se_is_element_type "text_button"
-let sel_cls_rotate      =  Stylesheet.se_has_element_class "rotate"
-let sel_state_pressed   =  Stylesheet.se_is_element_state 0 3
-let sel_state_hover     =  Stylesheet.se_is_element_state 0 2
-let sel_state_enable    =  Stylesheet.se_is_element_state 0 1
-
-let sel_button_rotate = fun e -> (sel_type_button e) && (sel_cls_rotate e)
-let sel_hover_button  = fun e -> (sel_type_button e) && (sel_state_hover e)
-
-let _ = 
-    Stylesheet.add_style_rule stylesheet [sel_cbox; sel_hover_button]
-             [("border_color", Sv_rgb [|1.;1.;1.;|]);
-             ];
-    Stylesheet.add_style_rule stylesheet [sel_cbox; sel_type_button]
-             [("border", Sv_floats (6,[|1.;1.;1.;1.;1.;1.;|]));
-             ];
-    Stylesheet.add_style_rule stylesheet [sel_true]
-             [("margin", Sv_floats (6,[|0.;0.;0.;0.;0.;0.;|]));
-             ];
-    ()
-
-
- *)
-
 (*a HML stuff *)
 exception Bad_tag of string
 open Structured_doc

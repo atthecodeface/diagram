@@ -141,6 +141,8 @@ let apply t =
 type t_styleable_desc = Types.t_styleable_desc
 type t_styleable      = Types.t_styleable
 type t_stylesheet     = Types.t_stylesheet
+type t_style_selector = Types.t_style_selector
+type t_style_match    = Types.t_style_match
 let create_desc         = Styleable_desc.create
 
 let se_create              = Styleable.create
@@ -148,10 +150,11 @@ let se_get_value_ref       = Styleable.get_value_ref
 let se_get_value           = Styleable.get_value
 let se_set_element_state   = Styleable.set_element_state
 let se_set_parent          = Styleable.set_parent
-let se_is_element_id       = Styleable.is_element_id
 let se_is_element_state    = Styleable.is_element_state
-let se_is_element_type     = Styleable.is_element_type
-let se_has_element_class   = Styleable.has_element_class
+let se_match_of_string     = Styleable.match_of_string
+let se_match_element_id    = Styleable.match_element_id
+let se_match_element_type  = Styleable.match_element_type
+let se_match_element_class = Styleable.match_element_class
 
 let sid_find_exn stylesheet s   = Style_ids.find_id_exn s stylesheet.ids
 let sid_get_type sid = Style_id.get_type sid
