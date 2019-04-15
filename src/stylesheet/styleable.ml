@@ -246,18 +246,20 @@ let element_callback_all_children _ e t callback =
   element_callback_matching_children (fun e -> true) e t callback
 
 (*f element_callback_matching_subelements *)
-let rec element_callback_matching_subelements selector e t callback = 
+let rec element_callback_matching_subelements (subtree,selector) e t callback = 
   element_callback_matching_children selector e t callback;
-  element_callback_all_children selector e t (fun e -> element_callback_matching_subelements selector e t callback);
+  if subtree then (
+    element_callback_all_children () e t (fun e -> element_callback_matching_subelements (true,selector) e t callback)
+  );
   ()
 
 (*f element_callback_all_subelements *)
 let element_callback_all_subelements _ e t callback = 
   element_callback_matching_children (fun e -> true) e t callback
 
-(*f element_callback_matching_tree *)
-let element_callback_matching_tree element_style_selector e t callback = 
+(*f element_callback_matching_tree : style_selector -> t -> 'a -> (styleable->unit) -> unit *)
+let element_callback_matching_tree (subtree,element_style_selector) e t callback = 
   if (element_style_selector e) then (callback e);
-  element_callback_matching_subelements element_style_selector e t callback
+  element_callback_matching_subelements (true,element_style_selector) e t callback
 
 (*f All done *)

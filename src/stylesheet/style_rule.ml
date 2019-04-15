@@ -29,7 +29,7 @@ let create selectors styles =
     styles;
   }
 
-(*f apply *)
+(*f apply : t -> 'a -> ('a->style_selector->(styleable->unit)->'b)->'b *)
 let apply t stylesheet element_callback_matching_tree =
   let apply_style e =
     Styleable.apply_styles (List.length t.selectors) t.styles e
@@ -40,7 +40,7 @@ let apply t stylesheet element_callback_matching_tree =
        let (sel,cbk) = sel_cbk_for_remaining_rules (nxt::tail) in
        (hd,  fun e -> Styleable.element_callback_matching_subelements sel e stylesheet cbk)
     | hd::tail -> (hd,apply_style)
-    | [] -> ((fun e -> true),apply_style)
+    | [] -> ((true,fun e -> true),apply_style)
   in
   let (sel,cbk) = sel_cbk_for_remaining_rules t.selectors in
   element_callback_matching_tree stylesheet sel cbk

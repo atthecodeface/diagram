@@ -117,7 +117,7 @@ let add_style_rule t selectors style_nvs =
   let rule = Style_rule.create selectors id_vs in
   t.rules <- rule :: t.rules
 
-(*f element_callback_matching_tree *)
+(*f element_callback_matching_tree : t -> style_selector -> (styleable->unit) -> unit *)
 let element_callback_matching_tree t selector callback =
   List.iter (fun e -> Styleable.element_callback_matching_tree selector e t callback) t.roots
 

@@ -307,7 +307,8 @@ module Rules = struct
     let selector_fns = add_selector_of_match selector_fns Stylesheet.se_match_element_class c.classes in
     let selector_fns = add_selector_of_match selector_fns Stylesheet.se_match_element_id    c.id in
     let selector_fns = add_selector_of_match selector_fns Stylesheet.se_match_element_type  c.tag in
-    fun t -> List.fold_left (fun acc sel -> acc && (sel t)) true selector_fns
+    let selector = fun t -> List.fold_left (fun acc sel -> acc && (sel t)) true selector_fns in
+    (c.subtree, selector)
 
   (*t t_rule *)
   type t_rule = {

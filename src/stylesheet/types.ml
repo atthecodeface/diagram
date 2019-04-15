@@ -68,7 +68,7 @@ type t_styleable= {
   }
 
 (*a Selectors and rules *)
-type t_style_selector = (t_styleable -> bool)
+type t_style_selector = bool * (t_styleable -> bool)
 
 type t_style_match = [ | `Equals of (string->bool) | `Matches of (string->bool) ]
 
