@@ -152,32 +152,31 @@ type t_layout_properties = {
         grid           : t_int4 option;   (* grid elements to cover w=1, h=1 are a single cell *)
         fill_color     : Primitives.Color.t;
         border_color   : Primitives.Color.t;
+        border_round   : float option; 
        (* 
     anchor - if placed then which part of bbox is placed at the anchor; if grid and does not fill space then where to move it to (x,y 0-1,0-1)
 expand - if grid and space available > min space then weight of expansion in x or y or both in call to 
     rotation
     scale (x,y)
 *)
-(* should this have a mutable min bbox that is set when that is calculated ? *)
-(* should this have a mutable grid layout ( (row number, posn, size, weight) list, (col number, posn, size, weight) list )  that is set when that is calculated ? *)
-(* should this have a mutable output bbox that is set when that is calculated ? *)
 }
 
 (*f make_layout_hdr stylesheet styleable - get actual data from the provided properties *)
 let make_layout_hdr stylesheet styleable =
-        let padding       = Properties.(get_property_rect   stylesheet styleable        Attr_names.padding) in
-        let border        = Properties.(get_property_rect   stylesheet styleable        Attr_names.border) in
-        let margin        = Properties.(get_property_rect   stylesheet styleable        Attr_names.margin) in
-        let place         = Properties.(get_property_vector_option stylesheet styleable Attr_names.place) in
-        let width         = Properties.(get_property_vector_option stylesheet styleable Attr_names.width) in
-        let height        = Properties.(get_property_vector_option stylesheet styleable Attr_names.height) in
-        let anchor        = Properties.(get_property_vector stylesheet styleable        Attr_names.anchor) in
-        let grid          = Properties.(get_property_int4_option   stylesheet styleable Attr_names.grid) in
-        let fill_color    = Properties.(get_property_color  stylesheet styleable        Attr_names.fill_color) in
-        let border_color  = Properties.(get_property_color  stylesheet styleable        Attr_names.border_color) in
+        let padding       = Properties.(get_property_rect   stylesheet styleable         Attr_names.padding) in
+        let border        = Properties.(get_property_rect   stylesheet styleable         Attr_names.border) in
+        let margin        = Properties.(get_property_rect   stylesheet styleable         Attr_names.margin) in
+        let place         = Properties.(get_property_vector_option stylesheet styleable  Attr_names.place) in
+        let width         = Properties.(get_property_vector_option stylesheet styleable  Attr_names.width) in
+        let height        = Properties.(get_property_vector_option stylesheet styleable  Attr_names.height) in
+        let anchor        = Properties.(get_property_vector stylesheet styleable         Attr_names.anchor) in
+        let grid          = Properties.(get_property_int4_option   stylesheet styleable  Attr_names.grid) in
+        let fill_color    = Properties.(get_property_color  stylesheet styleable         Attr_names.fill_color) in
+        let border_color  = Properties.(get_property_color  stylesheet styleable         Attr_names.border_color) in
+        let border_round  = Properties.(get_property_float_option  stylesheet styleable  Attr_names.border_round) in
 (* content_transform and content_inv_transform *)
 {
- padding; border; margin; place; width; height; anchor; grid; fill_color; border_color;
+ padding; border; margin; place; width; height; anchor; grid; fill_color; border_color; border_round;
 }
 
 (*f props_min_max *)
@@ -374,21 +373,38 @@ let get_bbox_element t tr cp min_bbox =
 let translate_string tr =
     if tr.translate==default_translate then "" else 
     let (dx,dy) = tr.translate in
-    Printf.sprintf "translate(%f %f)" dx dy
+    Printf.sprintf "translate(%g %g)" dx dy
 
 let scale_string tr =
     if tr.scale==default_scale then "" else 
     let (dx,dy) = tr.scale in
-    Printf.sprintf "scale(%f %f)" dx dy
+    Printf.sprintf "scale(%g %g)" dx dy
 
 let add_transform_tag tr tags =
     let t = translate_string tr in
     let s = scale_string tr in
     (Svg.attribute_string "transform" (String.concat " " [t; s])) :: tags
 
+let path_ele t coords = String.concat " " (t::(List.map (Printf.sprintf "%g") coords))
+
 let svg_border_path_coords t tr =
   let (x0,y0,x1,y1) = Rectangle.(shrink ~scale:(0.5) (shrink tr.bbox t.props.margin) t.props.border)  in
-  let path_string = Printf.sprintf "M%f %f L%f %f L%f %f L%f %f Z" x0 y0 x1 y0 x1 y1 x0 y1 in
+  let path_string = 
+    match t.props.border_round with
+    | None -> Printf.sprintf "M%g %g L%g %g L%g %g L%g %g Z" x0 y0 x1 y0 x1 y1 x0 y1
+    | Some r ->
+     String.concat " " [
+     path_ele "M" [(x0+.r); y0];
+     path_ele "L" [(x1-.r); y0];
+     path_ele "Q" [x1; y0; x1; (y0+.r)];
+     path_ele "L" [x1; (y1-.r)];
+     path_ele "Q" [x1; y1; (x1-.r); y1];
+     path_ele "L" [(x0+.r); y1];
+     path_ele "Q" [x0; y1; x0; (y1-.r)];
+     path_ele "L" [x0; (y0+.r)];
+     path_ele "Q" [x0; y0; (x0+.r); y0];
+    "Z"]
+  in
   Svg.attribute_string "d" path_string
 
 let svg_prepend_fill t tr s =
@@ -396,7 +412,7 @@ let svg_prepend_fill t tr s =
   let (bw,_,_,_) = t.props.border in
   if (Color.is_none t.props.fill_color) then s else 
     let stroke = Svg.attribute_string "stroke" "none" in
-    let stroke_width = Svg.attribute_string "stroke-width" (Printf.sprintf "%f" bw) in
+    let stroke_width = Svg.attribute_string "stroke-width" (Printf.sprintf "%g" bw) in
     let fill   = Color.svg_attr "fill" t.props.fill_color in
     let path = Svg.tag "path" [stroke; fill; stroke_width; coords] [] [] in
     path :: s
@@ -406,7 +422,7 @@ let svg_append_border t tr s =
   let (bw,_,_,_) = t.props.border in
   if (Color.is_none t.props.border_color) then s else 
     let stroke = Color.svg_attr "stroke" t.props.border_color in
-    let stroke_width = Svg.attribute_string "stroke-width" (Printf.sprintf "%f" bw) in
+    let stroke_width = Svg.attribute_string "stroke-width" (Printf.sprintf "%g" bw) in
     let fill   = Svg.attribute_string "fill" "none" in
     let path = Svg.tag "path" [stroke; fill; stroke_width; coords] [] [] in
     s @ [path]

@@ -17,37 +17,53 @@
  *
  *)
 
-open Structured_doc
 open Diaglib
 
+type args = {
+    mutable source          : string option;
+    source_is_xml           : bool ref;
+    mutable rev_style_files : string list;
+    mutable svg_filename    : string option;
+  }
 let main () =
-    (* let sdoc = (`String (0,diag_test)) in *)
-    let sdoc = (`Channel (open_in "examples/pipeline.dml")) in
-    let dss = (`Channel (open_in "examples/pipeline.dss")) in
-    let stylesheet = create_stylesheet () in
-    Stylesheet_ml.stylesheet_add_rules stylesheet dss;
-    let page_bbox = (1.,1.,110.,150.) in
-    (*let b = from_structured_doc (`String (0,diag_test)) in*)
-    let b = from_structured_doc sdoc in
-    Format.(pp_set_mark_tags std_formatter true);
-    pp_element Format.std_formatter b ;
-    Format.print_flush ();
-    Printf.printf "\n";
-    let gt = layout_elements stylesheet page_bbox b in
+  let exec = Filename.basename Sys.executable_name in
+  let usage = Printf.sprintf "Usage: %s [OPTION]\nPlots something\nOptions:" exec in
+  let args = { source=None;
+               source_is_xml = ref false;
+               rev_style_files = [];
+               svg_filename = None;
+             } in
+  let options = Arg.[
+                  "--xml", Set args.source_is_xml, "If used, source is XML format; else HML";
+                  "--f",   String (fun s->args.source <- Some s),       "Source filename";
+                  "--svg", String (fun s->args.svg_filename <- Some s), "Svg output file";
+                ]
+  in
+  let options = Arg.align options in (* Tidy up documentation in options *)
+  Arg.parse options (fun s -> args.rev_style_files <- s::args.rev_style_files) usage;
 
-    pp_geometry Format.std_formatter gt ;
-    Format.print_flush ();
-    Printf.printf "\n";
+  let stylesheet = create_stylesheet () in
+  List.iter (Stylesheet_ml.add_rules_from_file stylesheet) (List.rev args.rev_style_files);
+  let (must_close_f, f) = match args.source with
+    | None -> (false, stdin)
+    | Some string -> (true, open_in string)
+  in
+  let b = from_structured_doc (`Channel f) in
+  if must_close_f then (close_in f);
 
-    show_layout gt "";
-    let oc = open_out "a.svg" in
-    let svg = Svg.svg_doc (render_svg gt 0) page_bbox in
+  let page_bbox = (1.,1.,110.,150.) in
+  let gt = layout_elements stylesheet page_bbox b in
+  match args.svg_filename with
+  | Some s -> (
+    let (must_close_oc,oc) = if String.equal s "-" then (false,stdout) else (true,open_out s) in
+    let svg_diagram = render_svg gt 0 in
+    let svg = Svg.svg_doc Svg.(svg_defs::svg_diagram) page_bbox in
     Svg.svg_print_hdr oc;
-    Svg.pretty_print oc svg;
-    close_out oc;
-    ()
+    Svg.pretty_print ~extra_indent:"" oc svg;
+    if must_close_oc then close_out oc
+  )
+  | _ -> ()
 
 let _ =
   main () ;
-  (*test_me ()*)
 

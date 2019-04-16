@@ -53,42 +53,66 @@ let pretty_print_close_tag indent f t =
     let close_string = Printf.sprintf "</%s>" t.tag_type in
     pretty_print_indented indent f t close_string
     
-let rec pretty_print ?indent:(indent="") f t  =
+let rec pretty_print ?extra_indent:(extra_indent="  ") ?indent:(indent="") f t  =
   match t.cdata with
   | [] -> (
     match t.contents with 
     | [] -> pretty_print_open_tag indent true f t
     | _  ->
        ( pretty_print_open_tag indent false f t ;
-         List.iter (fun c -> pretty_print ~indent:(String.concat " " ["  "; indent]) f c) t.contents;
+         List.iter (fun c -> pretty_print ~extra_indent:extra_indent ~indent:(extra_indent^indent) f c) t.contents;
          pretty_print_close_tag indent f t
        )
   )
   | _ -> (
        ( pretty_print_open_tag indent false f t ;
-         List.iter (fun c -> pretty_print ~indent:(String.concat " " ["  "; indent]) f c) t.contents;
+         List.iter (fun c -> pretty_print ~extra_indent:extra_indent ~indent:(extra_indent^indent) f c) t.contents;
          List.iter (fun i->Printf.fprintf f "%s" i) t.cdata;
          pretty_print_close_tag indent f t
        )
   )
        
-
-(*
-<svg version="1.2" viewBox="0 0 25400 14288" 
- xmlns="http://www.w3.org/2000/svg"
- xmlns:ooo="http://xml.openoffice.org/svg/export"
- xmlns:xlink="http://www.w3.org/1999/xlink"
- xmlns:presentation="http://sun.com/xmlns/staroffice/presentation"
- xmlns:smil="http://www.w3.org/2001/SMIL20/"
- xmlns:anim="urn:oasis:names:tc:opendocument:xmlns:animation:1.0"
- xml:space="preserve">
- *)
-
 let svg_print_hdr f = 
     Printf.fprintf f "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
     Printf.fprintf f "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n";
     ()
 
+let svg_path ?close:(close=false) ?dx:(dx=0.) ?dy:(dy=0.) coords = 
+  let rec make_path coords n acc act i =
+    if (i>=n-1) then acc else (
+      let acc = Printf.sprintf "%s %s %g %g" acc act (coords.(i)+.dx) (coords.(i+1)+.dy) in
+      make_path coords n acc "L" (i+2)
+    )
+  in
+  let path = make_path coords (Array.length coords) "" "M" 0 in
+  if close then path ^ "z" else path
+
+let svg_defs =
+  let circle ?color:(color="context-stroke") cx cy r =
+    tag "circle" [FloatAttr("cx",cx); FloatAttr("cy",cy); FloatAttr("r",r); StringAttr("fill",color);] [] []
+  in
+  let shape ?color:(color="context-stroke") ?dx ?dy coords =
+    tag "path" [StringAttr("d",svg_path ~close:true ?dx:dx ?dy:dy coords); StringAttr("fill",color);] [] []
+  in
+  let triangle ?color:(color="context-stroke") ?dx:(dx=0.) w h =
+    tag "path" [StringAttr("d",Printf.sprintf"M %g 0 L %g %g L %g %g z" dx (w+.dx) (h/.2.) dx h); StringAttr("fill",color);] [] []
+  in
+  let marker id w h rx ry mw mh content =
+    tag "marker" [StringAttr("id",id); FloatsAttr("viewBox",[|0.;0.;w;h|]); StringAttr("orient","auto-start-reverse");
+                  FloatAttr("refX",rx); FloatAttr("refY",ry);
+                  FloatAttr("markerWidth",mw); FloatAttr("markerHeight",mh);] content []
+  in
+  let markers = [
+    marker "stub"    10. 10. 0.05 4.95  1.01 1.01     [shape [|0.;0.;10.;0.;10.;10.;0.;10.;|]; ];
+    marker "circ"    10. 10. 7.5 5. 3. 3.    [circle 5. 5. 5.; ]; (* refx=radius*(1-cos(asin(2/marker width))) *)
+    marker "extcirc" 10. 10. 0. 5. 3. 3.     [circle 5. 5. 5.; ]; (* ext so refx=0. - cannot do transparent yet (needs two paths) *)
+    marker "arr" 10. 10. 5. 5. 4. 3.      [triangle 10. 10.; ]; (* (length-refx)/2 = length/marker width *)
+    marker "dblarr" 15. 10. 10. 5. 4. 3.  [triangle 10. 10.; triangle ~dx:5. 10. 10.; ];
+    marker "arr2" 10. 10. 5. 5. 4. 3.     [shape [|0.;10.;10.;5.;0.;0.;5.;5.;|]; ];
+    marker "dblarr2" 15. 10. 10. 5. 4. 3. [shape [|0.;10.;10.;5.;0.;0.;5.;5.;|]; shape ~dx:5. [|0.;10.;10.;5.;0.;0.;5.;5.;|]; ];
+    ] in
+  tag "defs" [] markers []
+  
 let svg_doc contents bbox =
   let attributes = [
       (attribute_string "version" "1.2");

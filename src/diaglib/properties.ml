@@ -91,6 +91,14 @@ let replace_if_is_property_color t pn default =
 let get_property tl pn default : t = 
   List.fold_left (fun acc t -> replace_if_is_property t pn acc) default tl
 
+let get_property_float stylesheet styleable name =
+    Stylesheet.styleable_value_as_float stylesheet styleable name
+
+let get_property_float_option stylesheet styleable name =
+  if Stylesheet.styleable_value_is_none stylesheet styleable name then None else (
+    Some (Stylesheet.styleable_value_as_float stylesheet styleable name)
+  )
+
 let get_property_vector stylesheet styleable name =
     let f = Stylesheet.styleable_value_as_floats stylesheet styleable name in
     (f.(0), f.(1))

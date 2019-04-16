@@ -363,9 +363,11 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
         let rt  = resolve_styles stylesheet st in
         let etb = DesiredGeometry.make rt in
 
-    DesiredGeometry.pp Format.std_formatter etb ;
-    Format.print_flush ();
-    Printf.printf "\n";
+        (*
+        DesiredGeometry.pp Format.std_formatter etb ;
+        Format.print_flush ();
+        Printf.printf "\n";
+         *)
 
         let lt  = make_layout_within_bbox etb page_bbox in
         let gt  = finalize_geometry [] lt in

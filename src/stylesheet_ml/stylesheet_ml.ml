@@ -205,7 +205,7 @@ attrs allowed are style
           raise (Failed_to_parse (Printf.sprintf "Bad tag %s\n" x))
         )
       ) in
-    Printf.printf "%s\n" (str rules_t);
+    (* Printf.printf "%s\n" (str rules_t); *)
     get_ruleset rules_t
 
   (*f All done *)
@@ -364,7 +364,15 @@ module Stylesheet_ml = struct
     let ruleset_ml = Rules_ml.read_rules_from_hml stylesheet f in
     let rules = Rules.make ruleset_ml in
     rules
+
+  let add_rules stylesheet f =
+    let rules = read_rules_from_hml stylesheet f in
+    Rules.add_style_rules stylesheet rules
+
+  let add_rules_from_file stylesheet filename =
+    let f = open_in filename in
+    add_rules stylesheet (`Channel f);
+    close_in f
 end
-let stylesheet_add_rules stylesheet f =
-  let rules = Stylesheet_ml.read_rules_from_hml stylesheet f in
-  Rules.add_style_rules stylesheet rules
+let add_rules           = Stylesheet_ml.add_rules
+let add_rules_from_file = Stylesheet_ml.add_rules_from_file
