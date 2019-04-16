@@ -32,8 +32,8 @@ let styles = Stylesheet.Value.[ (Attr_names.classes, St_token_list,  sv_none_tok
                                 (Attr_names.rotation,     St_float,       sv_none_float, false);
                                 (Attr_names.border_round, St_float,       sv_none_float, false);
                                 (Attr_names.scale,        (St_floats 2),  sv_none_floats, false);
-                                (Attr_names.border_color, St_rgb,         sv_none_rgb, true); (* inherit *)
-                                (Attr_names.fill_color,   St_rgb,         sv_none_rgb, true); (* inherit *)
+                                (Attr_names.border_color, St_rgb,         sv_none_rgb, false); (* inherit *)
+                                (Attr_names.fill_color,   St_rgb,         sv_none_rgb, false); (* inherit *)
                                 (Attr_names.width,        (St_floats 2),  sv_none_floats, false);
                                 (Attr_names.height,       (St_floats 2),  sv_none_floats, false);
              ]

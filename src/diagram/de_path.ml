@@ -23,8 +23,7 @@ let resolve_styles et (resolver:t_style_resolver) =
   let rt : rt = {color; markers; stroke_width;} in
   (rt, [Attr_names.coords,Ev_floats ((Array.length coords),coords)])
 
-let r = Primitives.Rectangle.mk_fixed (0.,0.,100.,20.)
-let get_min_bbox et rt = (0.,0.,100.,20.)
+let get_min_bbox et rt = (0.,0.,0.,0.)
 let make_layout_within_bbox et rt bbox = (bbox,[])
 let finalize_geometry et rt lt (resolver:t_style_resolver) =
   let coords = resolver.value_as_floats Attr_names.coords in

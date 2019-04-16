@@ -209,12 +209,12 @@ let expand_bbox t bbox = Rectangle.(expand (expand (expand bbox t.padding) t.bor
 module GridDimension = struct
 type t = {
     grid : Grid.t;
-    expand_default : float;
-    expand_total : float;
-    expand : (int * float) list;
+    start_index : int;
+    last_index : int;
+    expansion : float array;
   }
 
-let make grid_cell_data =
+let make expand_default expand grid_cell_data =
     let grid = Grid.make grid_cell_data in
     (* Printf.printf "Grid %s\n" (Grid.str grid); *)
     let find_first_last_index (f,l) (s,n,_) =
@@ -223,20 +223,48 @@ let make grid_cell_data =
       (f,l)
     in
     (* note: start_index is inclusive and last_index is exclusive *)
-    let (start_index,last_index) = List.fold_left find_first_last_index (0,0) grid_cell_data in
-    let expand_default = 0. in
-    let expand         = [] in
-    let add_expansion acc (index, amount) =
-      if ((index<start_index) || (index>=last_index)) then acc else (
-        let (n,total) = acc in
-        (n+1, total+.amount)
-      )
+    let (start_index,last_index) = List.fold_left find_first_last_index (99999,0) grid_cell_data in
+    let start_index = min start_index last_index in
+    let n = last_index-start_index in
+    let expansion      = Array.make n expand_default in
+    let add_expansion (index, amount) =
+      let i = index - start_index in
+      if ((i>=0) && (i<n)) then expansion.(index-start_index)<-amount
     in
-    let (n,expand_total) = List.fold_left add_expansion (0,0.) expand in
-    let expand_total = expand_total +. (float (n-(last_index-start_index))) *. expand_default in
-    {grid; expand_default; expand_total; expand}
+    List.iter add_expansion expand;
+    let expand_total = Array.fold_left (fun a b -> a +. b) 0. expansion in
+    if (expand_total>0.) then Array.iteri (fun i v -> expansion.(i) <- v /. expand_total) expansion;
+    {grid; start_index; last_index; expansion }
+
 let get_span t = (0., Grid.get_last_position t.grid)
-let get_bbox t s n = (Grid.get_position t.grid s), (Grid.get_position t.grid (s+n))
+
+type t_layout = {
+    start_index : int;
+    last_index : int;
+    position : float array;
+  }
+let resize (t:t) w =
+  let n = t.last_index - t.start_index in
+  let position = Array.init (n+1) (fun i-> Grid.get_position t.grid (i+t.start_index)) in
+  let size     = Array.mapi (fun i _ -> position.(i+1) -. position.(i)) t.expansion in
+  let span = position.(n) in
+  let rec set_position extra i =
+    position.(i) <- position.(i)+.extra; (* do this for i==n *)
+    if (i<n) then (
+      let extra=extra +. (w-.span)*.t.expansion.(i) in
+      set_position extra (i+1)
+    )
+  in
+  set_position 0. 0;
+  {start_index=t.start_index; last_index=t.last_index; position;}
+  
+let get_bbox tl s n =
+  let i0 = s - tl.start_index in
+  let i1 = i0+n in
+  let i0 = max i0 0 in (* i0 >= 0 *)
+  let i1 = min i1 (tl.last_index-tl.start_index) in (* i1 <= n *)
+  if (i1<=i0) then (0.,0.) else (tl.position.(i0), tl.position.(i1))
+
 let str t = Grid.str t.grid
 end
 
@@ -277,7 +305,7 @@ end
 (*t t *)
 type t = {
     props  : t_layout_properties;
-    grids  : GridDimension.t list;
+    grids  : GridDimension.t * GridDimension.t;
     places : PlaceDimension.t list;
     min_bbox : t_rect;
   }
@@ -287,6 +315,8 @@ type t_transform = {
 translate : t_vector;
 scale     : t_vector;
 bbox      : t_rect; (* bounding box to be displayed in - do border/fill of this *)
+content_bbox      : t_rect; (* bounding box for content to be displayed in *)
+    grids  : GridDimension.t_layout * GridDimension.t_layout;
   }
 
 (*a Toplevel Layout module *)
@@ -299,6 +329,8 @@ let default_scale     = (1.,1.)
   and the properties and min_bbox of contents
  *)
 let create props children_props_bbox =
+  let expand_default = 1. in
+  let expand = [] in
   let build_grid_data acc ((cp,bbox) : (t_layout_properties * t_rect))  =
     if (is_placed cp) then acc else (
         let (cs,rs,cw,rw) = (match cp.grid with | None->(0,0,0,0) | Some x->x) in
@@ -308,7 +340,7 @@ let create props children_props_bbox =
     )
   in
   let (gcdx, gcdy) = List.fold_left build_grid_data ([],[]) children_props_bbox in
-  let grids  = List.map GridDimension.make [gcdx; gcdy] in
+  let grids  = List.map (GridDimension.make expand_default expand) [gcdx; gcdy] in
   let places = List.map (fun i -> PlaceDimension.make children_props_bbox i) [0; 1] in
   let grid_spans  = List.map GridDimension.get_span  grids  in
   let place_spans = List.map PlaceDimension.get_span places in
@@ -316,6 +348,7 @@ let create props children_props_bbox =
   let (gby,gty) = List.nth grid_spans 1 in    
   let (plx,prx) = List.hd  place_spans in    
   let (pby,pty) = List.nth place_spans 1 in
+  let grids = List.(hd grids, nth grids 1) in
   (* Printf.printf "grid bbox %f,%f,%f,%f place bbox %f,%f,%f,%f\n" glx gby grx gty plx pby prx pty; *)
   let min_bbox = Primitives.Rectangle.union (glx,gby,grx,gty) (plx,pby,prx,pty) in
   let (mcx,mcy,mw,mh) = Primitives.Rectangle.get_cwh min_bbox in
@@ -346,6 +379,9 @@ let layout_within_bbox t bbox =
     (* ccx,ccy , cw,ch is center/size of the min bbox for our contents *)
     let (ccx,ccy,cw,ch) = Primitives.Rectangle.get_cwh t.min_bbox in
     (* should determine content layout w/h - assume same as now - but could expand it *)
+    (* if expand *)
+    let cw=dw in
+    let ch=dh in
     (* So spare space can be determined - presumably +ve *)
     let (slack_x,slack_y) = ((dw-.cw),(dh-.ch)) in
     (* adjust ccx and ccy appropriately - depends on anchor coord *)
@@ -357,18 +393,27 @@ let layout_within_bbox t bbox =
     let content_bbox = Primitives.Rectangle.of_cwh (ccx,ccy,cw,ch) in
     let translate = default_translate in
     let scale     = default_scale in
-    let transform = {translate; scale; bbox;} in (* bbox is used for the border generation *)
+    let (gx, gy) = t.grids in
+    let gx = GridDimension.resize gx dw in
+    let gy = GridDimension.resize gy dh in
+    let grids = (gx, gy) in
+    let transform = {translate; scale; bbox; content_bbox; grids;} in (* bbox is used for the border generation - should include updated grid *)
     (* Printf.printf "Layout_within_bbox %s int bbox %s min bbox %s slack %f,%f returns content %s \n" (Primitives.Rectangle.str bbox) (Primitives.Rectangle.str internal_bbox) (Primitives.Rectangle.str t.min_bbox) slack_x slack_y (Primitives.Rectangle.str content_bbox); *)
     (transform, content_bbox)
 
 let get_bbox_element t tr cp min_bbox = 
-  if (is_placed cp) then min_bbox else (
-    let (cs,rs,cw,rw) = (match cp.grid with | None->(0,0,0,0) | Some x->x) in
-    let (x0,x1) = GridDimension.get_bbox (List.hd t.grids) cs cw in
-    let (y0,y1) = GridDimension.get_bbox (List.nth t.grids 1) rs rw in
-    (* Printf.printf "\nbbox for grid %f,%f, %f,%f, %d,%d,%d,%d\n" x0 y0 x1 y1 cs rs cw rw; *)
-    (x0,y0,x1,y1)
-  )
+  let (x0,y0,x1,y1) =
+    if (is_placed cp) then min_bbox else (
+      let (cs,rs,cw,rw) = (match cp.grid with | None->(0,0,0,0) | Some x->x) in
+      let (gx, gy) = tr.grids in
+      let (x0,x1) = GridDimension.get_bbox gx cs cw in
+      let (y0,y1) = GridDimension.get_bbox gy rs rw in
+      (* Printf.printf "\nbbox for grid %f,%f, %f,%f, %d,%d,%d,%d\n" x0 y0 x1 y1 cs rs cw rw; *)
+      (x0,y0,x1,y1)
+    )
+  in
+  let (dx,dy,_,_) = tr.content_bbox in
+  (x0+.dx, y0+.dy, x1+.dx, y1+.dy)
 
 let translate_string tr =
     if tr.translate==default_translate then "" else 
