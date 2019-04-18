@@ -57,7 +57,7 @@ let main () =
   | Some s -> (
     let (must_close_oc,oc) = if String.equal s "-" then (false,stdout) else (true,open_out s) in
     let svg_diagram = render_svg gt 0 in
-    let svg = Svg.svg_doc Svg.(svg_defs::svg_diagram) page_bbox in
+    let svg = Svg.(svg_doc "1.2" (svg_defs "1.2"::svg_diagram) page_bbox) in
     Svg.svg_print_hdr oc;
     Svg.pretty_print ~extra_indent:"" oc svg;
     if must_close_oc then close_out oc
