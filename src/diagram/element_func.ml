@@ -362,18 +362,24 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
 
     (*f prepare_elements *)
     let prepare_elements stylesheet (et:et) =
-        let st  = make_styleable stylesheet et in
-        ignore (Stylesheet.build stylesheet [st.styleable]);
-        Stylesheet.apply stylesheet;
-        let rt  = resolve_styles stylesheet st in
-        let etb = make_desired_geometry rt  in
-        etb
+      let st  = make_styleable stylesheet et in
+      ignore (Stylesheet.build stylesheet [st.styleable]);
+      Stylesheet.apply stylesheet;
+      let rt  = resolve_styles stylesheet st in
+      let etb = make_desired_geometry rt  in
+      etb
+
+    (*f get_prepared_size *)
+    let get_prepared_size etb =
+      let bbox = get_desired_min_bbox etb in
+      let (_,_,w,h) = Primitives.Rectangle.get_cwh bbox in
+      (w, h)
 
     (*f layout_elements *)
     let layout_elements page_bbox etb =
-        let lt  = make_layout_within_bbox etb page_bbox in
-        let gt  = finalize_geometry [] lt in
-        gt
+      let lt  = make_layout_within_bbox etb page_bbox in
+      let gt  = finalize_geometry [] lt in
+      gt
 
     (*f All done *)
 

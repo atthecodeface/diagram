@@ -74,14 +74,14 @@ let main () =
   if must_close_f then (close_in f);
 
   let etb = prepare_elements stylesheet b in
-  let page_bbox = prepared_min_bbox etb in
+  let (w,h) = prepared_size etb in
+  let page_bbox = (0.,0.,w,h) in
   let gt = layout_elements page_bbox etb in
   match args.svg_filename with
   | Some s -> (
     let (must_close_oc,oc) = if String.equal s "-" then (false,stdout) else (true,open_out s) in
     let svg_diagram = render_svg gt 0 in
-    let (x0,y0,x1,y1) = page_bbox in
-    let svg = Svg.(svg_doc "1.2" (svg_defs "1.2"::svg_diagram) (x0,y0,x1-.x0,y1-.y0)) in
+    let svg = Svg.(svg_doc "1.2" (svg_defs "1.2"::svg_diagram) page_bbox) in
     Svg.svg_print_hdr oc;
     Svg.pretty_print ~extra_indent:"" oc svg;
     if must_close_oc then close_out oc
