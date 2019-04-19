@@ -215,6 +215,9 @@ module DesiredGeometryFunc (LE : LayoutElementAggrType) = struct
     let properties = rt.properties in
     { th=rt.th; rt=rt.rt; properties; layout_properties=rt.layout_properties; eval=rt.eval; content_bbox; element_bbox; min_bbox; layout; content_etb }
 
+  (*f get_min_bbox *)
+  let get_min_bbox (etb:t) = etb.min_bbox
+
   (*f pp *)
   let rec pp ppf (etb:t) =
     pp_open ppf (LE.type_name_rt etb.rt) etb.th;
@@ -343,8 +346,10 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     let pp_layout   = Layout.pp
     let pp_geometry = FinalizedGeometry.pp
     let make_styleable = Styled.make_styleable
-    let make_layout_within_bbox = Layout.make_layout_within_bbox
     let resolve_styles = ResolvedStyled.resolve_styles
+    let make_desired_geometry = DesiredGeometry.make
+    let get_desired_min_bbox = DesiredGeometry.get_min_bbox
+    let make_layout_within_bbox = Layout.make_layout_within_bbox
     let finalize_geometry = FinalizedGeometry.finalize_geometry
     let render_svg = FinalizedGeometry.render_svg
 
@@ -355,20 +360,17 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       let indent = String.concat "" ["  "; indent] in
       List.iter (fun x -> show_layout x indent) gt.content_gt
 
-    (*f layout_elements *)
-    let layout_elements stylesheet page_bbox (et:et) =
+    (*f prepare_elements *)
+    let prepare_elements stylesheet (et:et) =
         let st  = make_styleable stylesheet et in
         ignore (Stylesheet.build stylesheet [st.styleable]);
         Stylesheet.apply stylesheet;
         let rt  = resolve_styles stylesheet st in
-        let etb = DesiredGeometry.make rt in
+        let etb = make_desired_geometry rt  in
+        etb
 
-        (*
-        DesiredGeometry.pp Format.std_formatter etb ;
-        Format.print_flush ();
-        Printf.printf "\n";
-         *)
-
+    (*f layout_elements *)
+    let layout_elements page_bbox etb =
         let lt  = make_layout_within_bbox etb page_bbox in
         let gt  = finalize_geometry [] lt in
         gt
