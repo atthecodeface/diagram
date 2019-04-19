@@ -28,13 +28,26 @@ type t_style_resolver = {
 
 (*t t_element_value *)
 type t_element_value =
-  | Ev_rect       of t_rect
-  | Ev_floats     of int * (float array)
-  | Ev_float      of float
-  | Ev_vector     of float * float
-  | Ev_string     of string
+  | Ev_rect         of t_rect
+  | Ev_floats       of int * (float array)
+  | Ev_float        of float
+  | Ev_vector       of float * float
+  | Ev_vectors      of int * (float array) * (float array)
+  | Ev_string       of string
 
 type t_element_properties = (string * t_element_value) list
+
+(*t t_desired_geometry
+  An object reports out that it would like to exist in (x0,y0,x1,y1) with a specific reference point inside that space
+
+  Initially an object may just have a width,height, in which case the geometry is really ((0,0), (0,0,w,h))
+
+  If just a BBox is supplied then the geometry is (0,0,w,h)
+ *)
+type t_desired_geometry =
+  | Dimensions of (float * float)
+  | Bbox of t_rect
+  | RefBbox of (t_vector * t_rect)
 
 (*m LayoutElementType *)
 module type LayoutElementType = sig

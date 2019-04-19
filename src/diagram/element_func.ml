@@ -233,14 +233,14 @@ module LayoutFunc (LE : LayoutElementAggrType) = struct
 
   (*f make_layout_within_bbox - make lt from etb *)
   let rec make_layout_within_bbox (etb:Types.t_desired_geometry) bbox : t= 
-    let (ltr, content_bbox) = Layout.layout_within_bbox etb.layout bbox in
+    let (ltr, content_bbox, layout_properties) = Layout.layout_within_bbox etb.layout bbox in
     let (lt, properties) = LE.make_layout_within_bbox etb.rt content_bbox in
     let layout_content_element (x : Types.t_desired_geometry) =
       let bbox = Layout.get_bbox_element etb.layout ltr x.layout_properties x.min_bbox in
       make_layout_within_bbox x bbox
     in
     let content_lt = List.map layout_content_element etb.content_etb in
-    let properties = properties @ etb.properties in
+    let properties = properties @ layout_properties @ etb.properties in
     { th=etb.th; lt; properties; eval=etb.eval; layout=etb.layout; ltr; content_lt; bbox; content_bbox}
 
   (*f pp *)

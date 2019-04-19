@@ -113,6 +113,9 @@ let get_property_rect stylesheet styleable name =
     let f = Stylesheet.styleable_value_as_floats stylesheet styleable name in
     (f.(0), f.(1), f.(2), f.(3))
 
+let get_property_int stylesheet styleable name =
+    Stylesheet.styleable_value_as_int stylesheet styleable name
+
 let get_property_int4 stylesheet styleable name =
     let f = Stylesheet.styleable_value_as_ints stylesheet styleable name in
     (f.(0), f.(1), f.(2), f.(3))

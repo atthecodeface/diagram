@@ -34,17 +34,14 @@ module LayoutElementFunc (E:LayoutElementType) = struct
       let layout_pl = [Attr_names.padding,Ev_floats (4, res.value_as_floats Attr_names.padding);
                        Attr_names.margin,Ev_floats (4, res.value_as_floats Attr_names.margin);
                        Attr_names.border,Ev_floats (4, res.value_as_floats Attr_names.border);
-                       Attr_names.bbox,Ev_rect Primitives.Rectangle.zeros;
                       ] in
       let (rt,pl) = E.resolve_styles et res in
       (rt,pl@layout_pl)
     )
   let get_min_bbox = E.get_min_bbox
   let make_layout_within_bbox et rt bbox = (
-      let layout_pl = [Attr_names.bbox,Ev_rect bbox;
-                      ] in
       let (lt,pl) = E.make_layout_within_bbox et rt bbox in
-      (lt,pl@layout_pl)
+      (lt,pl)
     )
 
   let finalize_geometry = E.finalize_geometry

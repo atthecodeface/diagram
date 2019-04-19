@@ -142,17 +142,18 @@ end
 (*m Top level of Layout *)
 (*t t_layout_properties *)
 type t_layout_properties = {
-        padding        : t_rect;
-        border         : t_rect;
-        margin         : t_rect;
-        place          : t_vector option; (* If placed this is where anchor * bbox is placed *)
-        width          : t_vector option; (* If None then no min/max width; else min/max width *)
-        height         : t_vector option; (* If None then no min/max height; else min/max height *)
-        anchor         : t_vector; (* If placed, where in bbox the place point is; if grid, where in cell bbox to place bbox *)
-        grid           : t_int4 option;   (* grid elements to cover w=1, h=1 are a single cell *)
-        fill_color     : Primitives.Color.t;
-        border_color   : Primitives.Color.t;
-        border_round   : float option; 
+        padding           : t_rect;
+        border            : t_rect;
+        margin            : t_rect;
+        place             : t_vector option; (* If placed this is where anchor * bbox is placed *)
+        width             : t_vector option; (* If None then no min/max width; else min/max width *)
+        height            : t_vector option; (* If None then no min/max height; else min/max height *)
+        anchor            : t_vector; (* If placed, where in bbox the place point is; if grid, where in cell bbox to place bbox *)
+        grid              : t_int4 option;   (* grid elements to cover w=1, h=1 are a single cell *)
+        fill_color        : Primitives.Color.t;
+        border_color      : Primitives.Color.t;
+        border_round      : float option; 
+        magnets_per_side  : int; 
        (* 
     anchor - if placed then which part of bbox is placed at the anchor; if grid and does not fill space then where to move it to (x,y 0-1,0-1)
 expand - if grid and space available > min space then weight of expansion in x or y or both in call to 
@@ -163,20 +164,21 @@ expand - if grid and space available > min space then weight of expansion in x o
 
 (*f make_layout_hdr stylesheet styleable - get actual data from the provided properties *)
 let make_layout_hdr stylesheet styleable =
-        let padding       = Properties.(get_property_rect   stylesheet styleable         Attr_names.padding) in
-        let border        = Properties.(get_property_rect   stylesheet styleable         Attr_names.border) in
-        let margin        = Properties.(get_property_rect   stylesheet styleable         Attr_names.margin) in
-        let place         = Properties.(get_property_vector_option stylesheet styleable  Attr_names.place) in
-        let width         = Properties.(get_property_vector_option stylesheet styleable  Attr_names.width) in
-        let height        = Properties.(get_property_vector_option stylesheet styleable  Attr_names.height) in
-        let anchor        = Properties.(get_property_vector stylesheet styleable         Attr_names.anchor) in
-        let grid          = Properties.(get_property_int4_option   stylesheet styleable  Attr_names.grid) in
-        let fill_color    = Properties.(get_property_color  stylesheet styleable         Attr_names.fill_color) in
-        let border_color  = Properties.(get_property_color  stylesheet styleable         Attr_names.border_color) in
-        let border_round  = Properties.(get_property_float_option  stylesheet styleable  Attr_names.border_round) in
+        let padding          = Properties.(get_property_rect   stylesheet styleable            Attr_names.padding) in
+        let border           = Properties.(get_property_rect   stylesheet styleable            Attr_names.border) in
+        let margin           = Properties.(get_property_rect   stylesheet styleable            Attr_names.margin) in
+        let magnets_per_side = Properties.(get_property_int    stylesheet styleable            Attr_names.magnets_per_side) in
+        let place            = Properties.(get_property_vector_option stylesheet styleable     Attr_names.place) in
+        let width            = Properties.(get_property_vector_option stylesheet styleable     Attr_names.width) in
+        let height           = Properties.(get_property_vector_option stylesheet styleable     Attr_names.height) in
+        let anchor           = Properties.(get_property_vector stylesheet styleable            Attr_names.anchor) in
+        let grid             = Properties.(get_property_int4_option   stylesheet styleable     Attr_names.grid) in
+        let fill_color       = Properties.(get_property_color  stylesheet styleable            Attr_names.fill_color) in
+        let border_color     = Properties.(get_property_color  stylesheet styleable            Attr_names.border_color) in
+        let border_round     = Properties.(get_property_float_option  stylesheet styleable     Attr_names.border_round) in
 (* content_transform and content_inv_transform *)
 {
- padding; border; margin; place; width; height; anchor; grid; fill_color; border_color; border_round;
+ padding; border; margin; place; width; height; anchor; grid; fill_color; border_color; border_round; magnets_per_side;
 }
 
 (*f props_min_max *)
@@ -373,7 +375,9 @@ shrink content bbox by padding/border/margin?
  hence translation to be applited to (content transform y) is dby-cby + (ds-cs)*anchor
  *)
 let layout_within_bbox t bbox = 
-    let internal_bbox = Primitives.Rectangle.(shrink (shrink (shrink bbox t.props.margin) t.props.border) t.props.padding) in
+    let border_bbox = Primitives.Rectangle.(shrink bbox t.props.margin) in
+    let padded_bbox = Primitives.Rectangle.(shrink border_bbox t.props.border) in
+    let internal_bbox = Primitives.Rectangle.(shrink padded_bbox t.props.padding) in
     (* dcx,dcy , dw,dh is center/size of the bbox to layout in after margin reduction *)
     let (dcx,dcy,dw,dh) = Primitives.Rectangle.get_cwh internal_bbox in
     (* ccx,ccy , cw,ch is center/size of the min bbox for our contents *)
@@ -399,7 +403,29 @@ let layout_within_bbox t bbox =
     let grids = (gx, gy) in
     let transform = {translate; scale; bbox; content_bbox; grids;} in (* bbox is used for the border generation - should include updated grid *)
     (* Printf.printf "Layout_within_bbox %s int bbox %s min bbox %s slack %f,%f returns content %s \n" (Primitives.Rectangle.str bbox) (Primitives.Rectangle.str internal_bbox) (Primitives.Rectangle.str t.min_bbox) slack_x slack_y (Primitives.Rectangle.str content_bbox); *)
-    (transform, content_bbox)
+    let magnets =
+      let (x0,y0,x1,y1)=bbox in
+      if (t.props.magnets_per_side>1) then (
+        let mps = t.props.magnets_per_side-1 in
+        let fmps = float mps in
+        let dx = (x1 -. x0) /. (float mps) in
+        let dy = (y1 -. y0) /. (float mps) in
+        let x_of_i i = if (i<=mps) then (float i) else if (i<=2*mps) then fmps            else if (i<=3*mps) then fmps-.(float (i-2*mps)) else 0. in
+        let y_of_i i = if (i<=mps) then 0.        else if (i<=2*mps) then (float (i-mps)) else if (i<=3*mps) then fmps                    else fmps-.(float (i-3*mps)) in
+        let xs = Array.init (mps*4) (fun i->let x=x_of_i i in x0+.dx*.x) in
+        let ys = Array.init (mps*4) (fun i->let y=y_of_i i in y0+.dy*.y) in
+        Ev_vectors ((mps*4),xs,ys)
+      ) else (
+        Ev_vectors (4,[|x0;x0;x1;x1|],[|y0;y1;y1;y0|])
+      )
+    in
+    let layout_pl = [Attr_names.outer_bbox,Ev_rect bbox;
+                     Attr_names.border_bbox,Ev_rect border_bbox;
+                     Attr_names.padded_bbox,Ev_rect padded_bbox;
+                     Attr_names.content_bbox,Ev_rect content_bbox;
+                     Attr_names.magnets, magnets;
+                      ] in
+    (transform, content_bbox, layout_pl)
 
 let get_bbox_element t tr cp min_bbox = 
   let (x0,y0,x1,y1) =

@@ -17,6 +17,28 @@
  *
  *)
 
+(*a To do
+
+new geometry
+
+Dog-legs or connectors
+
+rounding in paths
+shorten in paths
+color library
+
+; fonts
+; refs
+; defs
+; reduce coords by marker length
+; text anchor vertically
+; expand
+; fill
+font metrics
+
+new eval to have types
+ *)
+
 open Diaglib
 
 type args = {
