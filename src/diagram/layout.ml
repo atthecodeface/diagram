@@ -142,15 +142,16 @@ end
 (*m Top level of Layout *)
 (*t t_layout_properties *)
 type t_layout_properties = {
+        place             : t_vector option; (* If placed this is where reference point is placed *)
+        width             : t_vector option; (* If None then no min/max width; else min/max width *)
+        height            : t_vector option; (* If None then no min/max height; else min/max height *)
+        anchor            : t_vector; (* If does not fill its outer bbox, then where it is anchored to (-1 top/left, 1 bottom/right) *)
+        grid              : t_int4 option;   (* grid elements to cover w=1, h=1 are a single cell *)
+        z_index           : float;
         padding           : t_rect;
         border            : t_rect;
         margin            : t_rect;
-        place             : t_vector option; (* If placed this is where anchor * bbox is placed *)
-        width             : t_vector option; (* If None then no min/max width; else min/max width *)
-        height            : t_vector option; (* If None then no min/max height; else min/max height *)
-        anchor            : t_vector; (* If placed, where in bbox the place point is; if grid, where in cell bbox to place bbox *)
-        grid              : t_int4 option;   (* grid elements to cover w=1, h=1 are a single cell *)
-        fill_color        : Primitives.Color.t;
+        border_fill       : Primitives.Color.t;
         border_color      : Primitives.Color.t;
         border_round      : float option; 
         magnets_per_side  : int; 
@@ -164,21 +165,38 @@ expand - if grid and space available > min space then weight of expansion in x o
 
 (*f make_layout_hdr stylesheet styleable - get actual data from the provided properties *)
 let make_layout_hdr stylesheet styleable =
-        let padding          = Properties.(get_property_rect   stylesheet styleable            Attr_names.padding) in
-        let border           = Properties.(get_property_rect   stylesheet styleable            Attr_names.border) in
-        let margin           = Properties.(get_property_rect   stylesheet styleable            Attr_names.margin) in
-        let magnets_per_side = Properties.(get_property_int    stylesheet styleable            Attr_names.magnets_per_side) in
-        let place            = Properties.(get_property_vector_option stylesheet styleable     Attr_names.place) in
-        let width            = Properties.(get_property_vector_option stylesheet styleable     Attr_names.width) in
-        let height           = Properties.(get_property_vector_option stylesheet styleable     Attr_names.height) in
-        let anchor           = Properties.(get_property_vector stylesheet styleable            Attr_names.anchor) in
-        let grid             = Properties.(get_property_int4_option   stylesheet styleable     Attr_names.grid) in
-        let fill_color       = Properties.(get_property_color  stylesheet styleable            Attr_names.fill_color) in
-        let border_color     = Properties.(get_property_color  stylesheet styleable            Attr_names.border_color) in
-        let border_round     = Properties.(get_property_float_option  stylesheet styleable     Attr_names.border_round) in
+  let grid_value_of_n n ints =
+    match n with | 0 -> (0,0,0,0)
+                 | 1 -> (ints.(0),ints.(0),1,1)
+                 | _ -> (ints.(0),ints.(1),1,1)
+  in
+  let wh_value_of_n n floats =
+    match n with | 0 -> (0.,1.E20)
+                 | _ -> (floats.(0),1.E20)
+  in
+  let pbm_value_of_n n floats =
+    match n with | 0 -> (0.,0.,0.,0.)
+                 | 1 -> (floats.(0),floats.(0),floats.(0),floats.(0))
+                 | _ -> (floats.(0),floats.(1),floats.(0),floats.(1))
+  in
+  let open Properties in
+  let magnets_per_side = get_property_int    stylesheet styleable            Attr_names.magnets_per_side in
+  let place            = get_property_vector_option stylesheet styleable     Attr_names.place in
+  let width            = get_property_vector_option ~value_of_n:wh_value_of_n stylesheet styleable     Attr_names.width in
+  let height           = get_property_vector_option ~value_of_n:wh_value_of_n stylesheet styleable     Attr_names.height in
+  let anchor           = get_property_vector stylesheet styleable            Attr_names.anchor in
+  let grid             = get_property_int4_option  ~value_of_n:grid_value_of_n stylesheet styleable     Attr_names.grid in
+  let z_index          = get_property_float  stylesheet styleable            Attr_names.z_index in
+  let padding          = get_property_rect  ~value_of_n:pbm_value_of_n stylesheet styleable            Attr_names.padding in
+  let border           = get_property_rect  ~value_of_n:pbm_value_of_n stylesheet styleable            Attr_names.border in
+  let margin           = get_property_rect  ~value_of_n:pbm_value_of_n stylesheet styleable            Attr_names.margin in
+  let border_fill      = get_property_color  stylesheet styleable            Attr_names.border_fill in
+  let border_color     = get_property_color  stylesheet styleable            Attr_names.border_color in
+  let border_round     = get_property_float_option  stylesheet styleable     Attr_names.border_round in
 (* content_transform and content_inv_transform *)
 {
- padding; border; margin; place; width; height; anchor; grid; fill_color; border_color; border_round; magnets_per_side;
+  place; width; height; anchor; grid; z_index;
+  padding; border; margin; border_fill; border_color; border_round; magnets_per_side;
 }
 
 (*f props_min_max *)
@@ -245,6 +263,7 @@ type t_layout = {
     last_index : int;
     position : float array;
   }
+
 let resize (t:t) w =
   let n = t.last_index - t.start_index in
   let position = Array.init (n+1) (fun i-> Grid.get_position t.grid (i+t.start_index)) in
@@ -258,6 +277,7 @@ let resize (t:t) w =
     )
   in
   set_position 0. 0;
+  (* Printf.printf "Grid resized %s\n" (Grid.str t.grid); *)
   {start_index=t.start_index; last_index=t.last_index; position;}
   
 let get_bbox tl s n =
@@ -358,6 +378,9 @@ let create props children_props_bbox =
   let mh = props_min_max props.height mh in
   let min_bbox = Primitives.Rectangle.of_cwh (mcx, mcy, mw, mh) in
   {props; grids; places; min_bbox;}
+
+(*f get_z_index - get the z_index *)
+let get_z_index t = t.props.z_index
 
 (*f get_min_bbox - get the minimum bbox required by the content given grid and placemet (previously created as t) *)
 let get_min_bbox t = t.min_bbox
@@ -481,10 +504,10 @@ let svg_border_path_coords t tr =
 let svg_prepend_fill t tr s =
   let coords = svg_border_path_coords t tr in
   let (bw,_,_,_) = t.props.border in
-  if (Color.is_none t.props.fill_color) then s else 
+  if (Color.is_none t.props.border_fill) then s else 
     let stroke = Svg.attribute_string "stroke" "none" in
     let stroke_width = Svg.attribute_string "stroke-width" (Printf.sprintf "%g" bw) in
-    let fill   = Color.svg_attr "fill" t.props.fill_color in
+    let fill   = Color.svg_attr "fill" t.props.border_fill in
     let path = Svg.tag "path" [stroke; fill; stroke_width; coords] [] [] in
     path :: s
 
@@ -498,10 +521,15 @@ let svg_append_border t tr s =
     let path = Svg.tag "path" [stroke; fill; stroke_width; coords] [] [] in
     s @ [path]
 
-let render_svg t tr id svg_contents = 
-    let svg_contents = svg_prepend_fill  t tr svg_contents in
-    let svg_contents = svg_append_border t tr svg_contents in
+let render_svg t tr id z_index make_element_svg svg_contents =
+  let (id_attrs,svg_contents) =
+    if t.props.z_index = z_index then (
+      let svg_contents = (make_element_svg z_index) @ svg_contents in
+      let svg_contents = svg_prepend_fill  t tr svg_contents in
+      let svg_contents = svg_append_border t tr svg_contents in
+      ([Svg.attribute_string "id" id], svg_contents)
+    ) else ( [], svg_contents )
+  in
     match svg_contents with 
     | [] -> []
-    | s -> 
-    [Svg.tag "g" (add_transform_tag tr [Svg.attribute_string "id" id]) s []]
+    | s -> [ Svg.tag "g" (add_transform_tag tr id_attrs) s []]

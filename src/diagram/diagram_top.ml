@@ -80,7 +80,7 @@ let main () =
   match args.svg_filename with
   | Some s -> (
     let (must_close_oc,oc) = if String.equal s "-" then (false,stdout) else (true,open_out s) in
-    let svg_diagram = render_svg gt 0 in
+    let svg_diagram = render_svg gt in
     let svg = Svg.(svg_doc "1.2" (svg_defs "1.2"::svg_diagram) page_bbox) in
     Svg.svg_print_hdr oc;
     Svg.pretty_print ~extra_indent:"" oc svg;

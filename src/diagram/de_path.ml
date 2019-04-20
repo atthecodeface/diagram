@@ -28,7 +28,7 @@ let make_layout_within_bbox et rt bbox = (bbox,[])
 let finalize_geometry et rt lt (resolver:t_style_resolver) =
   let coords = resolver.value_as_floats Attr_names.coords in
   {coords}
-let render_svg et rt lt gt i = 
+let render_svg et rt lt gt z_index = 
   let open Svg in
   let path = svg_path gt.coords in
   let attrs = [] in

@@ -61,7 +61,7 @@ module type LayoutElementType = sig
     val get_min_bbox : et -> rt -> t_rect
     val make_layout_within_bbox : et -> rt -> t_rect -> (lt * t_element_properties)
     val finalize_geometry : et -> rt -> lt -> t_style_resolver -> gt
-    val render_svg   : et -> rt -> lt -> gt -> int -> Svg.t list
+    val render_svg   : et -> rt -> lt -> gt -> float -> Svg.t list
 end
 
 (*a Aggregate layout element modules *)
@@ -81,5 +81,5 @@ module type LayoutElementAggrType = sig
     val get_min_bbox : rt -> t_rect
     val make_layout_within_bbox : rt -> t_rect -> (lt * t_element_properties)
     val finalize_geometry : lt -> t_style_resolver -> gt
-    val render_svg   : gt -> int -> Svg.t list
+    val render_svg   : gt -> float -> Svg.t list
 end

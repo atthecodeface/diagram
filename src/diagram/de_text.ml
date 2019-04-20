@@ -114,7 +114,7 @@ let finalize_geometry et (rt:rt) lt (resolver:t_style_resolver) =
   let (x0,y0,x1,y1) = lt in
   let (cx,w) = ( (x0+.x1)/.2., (x1-.x0)/.2. ) in
   let text_xy i (w,text) =
-    let y = y0 +. (float i) *. rt.line_spacing +. rt.text_height in
+    let y = y0 +. (float i) *. (rt.line_spacing +. rt.text_height) +. rt.text_height in
     if (rt.align<(-1.)) then (x0, y)
     else if (rt.align>(1.)) then (x1, y)
     else (cx+.w*.rt.align,y)
@@ -138,5 +138,5 @@ let render_line_svg et rt lt gt text (x,y) =
 (*f render_svg : et -> rt -> lt -> gt -> float zindex -> svg list
   Render into a list of SVG tags
  *)
-let render_svg et rt lt gt i = 
+let render_svg et rt lt gt z_index = 
   List.map2 (render_line_svg et rt lt gt) et.text gt.xys

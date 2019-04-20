@@ -20,6 +20,8 @@
 (*a Import modules *)
 module Color     = Primitives.Color
 module Rectangle = Primitives.Rectangle
+module FloatElt = struct type t=float let compare  = compare end
+module FloatSet = Set.Make(FloatElt)
 open Types
 
 exception Eval_error of string
@@ -319,11 +321,17 @@ module FinalizedGeometryFunc (LE : LayoutElementAggrType) = struct
     let gt = LE.finalize_geometry lt.lt resolver in
     { th=lt.th; gt=gt; layout=lt.layout; ltr=lt.ltr; content_gt; bbox=lt.bbox;}
 
-    (*f render_svg gt index - return a list of SVG tags that make up the element *)
-    let rec render_svg (gt:t) zindex =
-      let content_svg   = List.fold_left (fun a x -> a @ (render_svg x zindex)) [] gt.content_gt in
-      let element_svg   = LE.render_svg gt.gt zindex in
-      Layout.render_svg gt.layout gt.ltr gt.th.id (content_svg @ element_svg) 
+  (*f find_zindices - add z_indices to the set *)
+  let rec find_zindices z_indices (gt:t)  =
+    let z_index = Layout.get_z_index gt.layout in
+    let z_indices = FloatSet.add z_index z_indices in
+    List.fold_left find_zindices z_indices gt.content_gt
+
+  (*f render_svg gt index - return a list of SVG tags that make up the element *)
+  let rec render_svg (gt:t) z_index =
+    let content_svg   = List.fold_left (fun a x -> a @ (render_svg x z_index)) [] gt.content_gt in
+    let make_element_svg = LE.render_svg gt.gt in
+    Layout.render_svg gt.layout gt.ltr gt.th.id z_index make_element_svg content_svg
 
 end
 
@@ -351,7 +359,12 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     let get_desired_min_bbox = DesiredGeometry.get_min_bbox
     let make_layout_within_bbox = Layout.make_layout_within_bbox
     let finalize_geometry = FinalizedGeometry.finalize_geometry
-    let render_svg = FinalizedGeometry.render_svg
+    let render_svg gt =
+      let z_indices = FloatSet.empty in
+      let z_indices = FinalizedGeometry.find_zindices z_indices gt in
+      let z_indices = FloatSet.elements z_indices in
+      let svg_list = List.map (FinalizedGeometry.render_svg gt) z_indices in
+      List.concat svg_list
 
     (*f show_layout *)
     type gt = FinalizedGeometry.t

@@ -92,10 +92,10 @@ module DiagramElement = struct
     | LPath (e,r,l) -> GPath (e,r,l,(Path.finalize_geometry e r l res))
     | LBox  (e,r,l) -> GBox  (e,r,l,(Box.finalize_geometry  e r l res))
  
-  let render_svg gt zindex = 
+  let render_svg gt z_index = 
     match gt with
-    | GText (e,r,l,g) -> Text.render_svg e r l g zindex
-    | GPath (e,r,l,g) -> Path.render_svg e r l g zindex
+    | GText (e,r,l,g) -> Text.render_svg e r l g z_index
+    | GPath (e,r,l,g) -> Path.render_svg e r l g z_index
     | GBox  (e,r,l,g) -> []
 
 end

@@ -58,6 +58,7 @@ let property_num t =
   | Width _        -> Width_
   | Height _       -> Height_
 
+                    
 let is_property t pn = (property_num t)==pn
 
 let replace_if_is_property t pn default : t =
@@ -88,6 +89,10 @@ let replace_if_is_property_color t pn default =
   | BorderColor v  -> if (pn==BorderColor_) then v else default
   | _ -> default
 
+let invoke_if_some f n a =
+  match f with | None -> failwith "properties invoke_if_some has no fallback"
+               | Some f -> f n a
+
 let get_property tl pn default : t = 
   List.fold_left (fun acc t -> replace_if_is_property t pn acc) default tl
 
@@ -99,31 +104,36 @@ let get_property_float_option stylesheet styleable name =
     Some (Stylesheet.styleable_value_as_float stylesheet styleable name)
   )
 
-let get_property_vector stylesheet styleable name =
+let get_property_vector ?value_of_n stylesheet styleable name =
     let f = Stylesheet.styleable_value_as_floats stylesheet styleable name in
-    (f.(0), f.(1))
+    let n = Array.length f in
+    if (n<2) then (invoke_if_some value_of_n n f) else (f.(0), f.(1))
 
-let get_property_vector_option stylesheet styleable name =
+let get_property_vector_option ?value_of_n stylesheet styleable name =
   if Stylesheet.styleable_value_is_none stylesheet styleable name then None else (
     let f = Stylesheet.styleable_value_as_floats stylesheet styleable name in
-    Some (f.(0), f.(1))
+    let n = Array.length f in
+    if (n<2) then Some (invoke_if_some value_of_n n f) else Some (f.(0), f.(1))
   )
 
-let get_property_rect stylesheet styleable name =
+let get_property_rect ?value_of_n stylesheet styleable name =
     let f = Stylesheet.styleable_value_as_floats stylesheet styleable name in
-    (f.(0), f.(1), f.(2), f.(3))
+    let n = Array.length f in
+    if (n<4) then (invoke_if_some value_of_n n f) else (f.(0), f.(1), f.(2), f.(3))
 
 let get_property_int stylesheet styleable name =
     Stylesheet.styleable_value_as_int stylesheet styleable name
 
-let get_property_int4 stylesheet styleable name =
+let get_property_int4 ?value_of_n stylesheet styleable name =
     let f = Stylesheet.styleable_value_as_ints stylesheet styleable name in
-    (f.(0), f.(1), f.(2), f.(3))
+    let n = Array.length f in
+    if (n<4) then (invoke_if_some value_of_n n f) else (f.(0), f.(1), f.(2), f.(3))
 
-let get_property_int4_option stylesheet styleable name =
+let get_property_int4_option ?value_of_n stylesheet styleable name =
   if Stylesheet.styleable_value_is_none stylesheet styleable name then None else (
     let f = Stylesheet.styleable_value_as_ints stylesheet styleable name in
-    Some (f.(0), f.(1), f.(2), f.(3))
+    let n = Array.length f in
+    if (n<4) then Some (invoke_if_some value_of_n n f) else Some (f.(0), f.(1), f.(2), f.(3))
   )
 
 let get_property_color stylesheet styleable name =
