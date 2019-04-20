@@ -60,7 +60,8 @@ module Rectangle = struct
   type t = Uniform of float 
                | Fixed of t_rect
                | Func of (t_expr_resolver -> t_value)
-    let zeros = (0., 0., 0., 0.)
+  let zeros = (0., 0., 0., 0.)
+            let is_zero r = r==zeros
     let as_floats (a,b,c,d) = [|a;b;c;d;|]
     let add_values a b =
       let (a0,a1,a2,a3) = a in
@@ -72,14 +73,22 @@ module Rectangle = struct
       (a0-.scale*.b0, a1-.scale*.b1, a2+.scale*.b2, a3+.scale*.b3)
     let shrink ?scale:(scale=1.0) a b = expand ~scale:(-. scale) a b
     let union a b =
-      let (a0,a1,(a2:float),a3) = a in
-      let (b0,b1,(b2:float),b3) = b in
-      ((min a0 b0), (min a1 b1), (max a2 b2), (max a3 b3))
+      if (is_zero a) then b else if (is_zero b) then a else (
+        let (a0,a1,(a2:float),a3) = a in
+        let (b0,b1,(b2:float),b3) = b in
+        ((min a0 b0), (min a1 b1), (max a2 b2), (max a3 b3))
+      )
     let intersect a b =
-      let (a0,a1,a2,a3) = a in
-      let (b0,b1,b2,b3) = b in
-      let (r0,r1,r2,r3) = (max a0 b0, max a1 b1, min a2 b2, min a3 b3) in
-      if ((r2<=r0) || (r3<=r1)) then zeros else (r0,r1,r2,r3)
+      if (is_zero a) then a else if (is_zero b) then b else (
+        let (a0,a1,a2,a3) = a in
+        let (b0,b1,b2,b3) = b in
+        let (r0,r1,r2,r3) = (max a0 b0, max a1 b1, min a2 b2, min a3 b3) in
+        if ((r2<=r0) || (r3<=r1)) then zeros else (r0,r1,r2,r3)
+      )
+    let translate r v =
+      let (xr, yr) = v in
+      let (x0,x1,y0,y1) = r in
+      (x0 +. xr, y0 +. yr, x1 +. xr, y1 +. yr)
     let mk_fixed r = Fixed r
     let value x n =
       match x with

@@ -44,10 +44,10 @@ type t_element_properties = (string * t_element_value) list
 
   If just a BBox is supplied then the geometry is (0,0,w,h)
  *)
-type t_desired_geometry =
-  | Dimensions of (float * float)
-  | Bbox of t_rect
-  | RefBbox of (t_vector * t_rect)
+type t_ref_bbox = {
+    reference : t_vector;
+    bbox : t_rect;
+  }
 
 (*m LayoutElementType *)
 module type LayoutElementType = sig
@@ -58,7 +58,7 @@ module type LayoutElementType = sig
 
     val styles       : (string * Stylesheet.Value.t_styleable_type * Stylesheet.Value.t_styleable_value * bool) list
     val resolve_styles : et -> t_style_resolver -> (rt * t_element_properties)
-    val get_min_bbox : et -> rt -> t_rect
+    val get_desired_geometry : et -> rt -> t_ref_bbox
     val make_layout_within_bbox : et -> rt -> t_rect -> (lt * t_element_properties)
     val finalize_geometry : et -> rt -> lt -> t_style_resolver -> gt
     val render_svg   : et -> rt -> lt -> gt -> float -> Svg.t list
@@ -78,7 +78,7 @@ module type LayoutElementAggrType = sig
     val type_name_lt  : lt -> string
     val type_name_gt  : gt -> string
     val resolve_styles : et -> t_style_resolver -> (rt * t_element_properties)
-    val get_min_bbox : rt -> t_rect
+    val get_desired_geometry : rt -> t_ref_bbox
     val make_layout_within_bbox : rt -> t_rect -> (lt * t_element_properties)
     val finalize_geometry : lt -> t_style_resolver -> gt
     val render_svg   : gt -> float -> Svg.t list

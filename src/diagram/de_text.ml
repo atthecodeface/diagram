@@ -80,7 +80,7 @@ let resolve_styles et (resolver:t_style_resolver) =
   let rt = {font; size; align; line_spacing; text_height; text_widths} in
   (rt, [])
 
-(*f get_min_bbox_ref : et -> rt -> vector reference point and bbox
+(*f get_desired_geometry : et -> rt -> t_desired_geometry
   BBox is 0,0,w,h
   If 'aligh to top' then ref point has y of 0
   If 'aligh to bottom,' then ref point has y of h
@@ -88,10 +88,10 @@ let resolve_styles et (resolver:t_style_resolver) =
 
   If the ref point is explicitly placed somewhere then
  *)
-let get_min_bbox et rt =
+let get_desired_geometry et rt =
   let max_width = List.fold_left (fun acc (w,_) -> if (w>acc) then w else acc) 0. rt.text_widths in
   let height = ((float et.num_lines) *. rt.text_height) +. ((float (et.num_lines - 1)) *. rt.line_spacing) in
-  (0.,0.,max_width,height)
+  Desired_geometry.make_wh max_width height
 
 (*a Functions for layout *)
 (*f make_layout_within_bbox : et -> rt -> ref pt * bbox `-> lt * properties

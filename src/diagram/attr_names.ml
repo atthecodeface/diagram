@@ -12,7 +12,6 @@ let translate = "translate"
 let transform = "transform"
 let z_index = "z_index"
 let align = "align"
-let anchor = "anchor"
               
 let margin = "margin"
 let border = "border"

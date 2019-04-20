@@ -38,7 +38,7 @@ module LayoutElementFunc (E:LayoutElementType) = struct
       let (rt,pl) = E.resolve_styles et res in
       (rt,pl@layout_pl)
     )
-  let get_min_bbox = E.get_min_bbox
+  let get_desired_geometry = E.get_desired_geometry
   let make_layout_within_bbox et rt bbox = (
       let (lt,pl) = E.make_layout_within_bbox et rt bbox in
       (lt,pl)

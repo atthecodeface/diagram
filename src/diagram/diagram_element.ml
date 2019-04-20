@@ -74,11 +74,11 @@ module DiagramElement = struct
     | EPath e      -> let (r,pl) = Path.resolve_styles e resolver in (RPath (e,r), pl)
     | EBox  e      -> let (r,pl) = Box.resolve_styles  e resolver in (RBox  (e,r), pl)
 
-  let get_min_bbox rt = 
+  let get_desired_geometry rt = 
     match rt with
-    | RText (e,r)      -> Text.get_min_bbox e r
-    | RPath (e,r)      -> Path.get_min_bbox e r
-    | RBox  (e,r)      -> Box.get_min_bbox  e r
+    | RText (e,r)      -> Text.get_desired_geometry e r
+    | RPath (e,r)      -> Path.get_desired_geometry e r
+    | RBox  (e,r)      -> Box.get_desired_geometry  e r
 
   let make_layout_within_bbox rt (bbox : t_rect) = 
     match rt with

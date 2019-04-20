@@ -145,6 +145,7 @@ type t_layout_properties = {
         place             : t_vector option; (* If placed this is where reference point is placed *)
         width             : t_vector option; (* If None then no min/max width; else min/max width *)
         height            : t_vector option; (* If None then no min/max height; else min/max height *)
+        expand            : t_vector; (* Amount of slack to take up in each direction, 0 to 1 *)
         anchor            : t_vector; (* If does not fill its outer bbox, then where it is anchored to (-1 top/left, 1 bottom/right) *)
         grid              : t_int4 option;   (* grid elements to cover w=1, h=1 are a single cell *)
         z_index           : float;
@@ -156,8 +157,6 @@ type t_layout_properties = {
         border_round      : float option; 
         magnets_per_side  : int; 
        (* 
-    anchor - if placed then which part of bbox is placed at the anchor; if grid and does not fill space then where to move it to (x,y 0-1,0-1)
-expand - if grid and space available > min space then weight of expansion in x or y or both in call to 
     rotation
     scale (x,y)
 *)
@@ -184,6 +183,7 @@ let make_layout_hdr stylesheet styleable =
   let place            = get_property_vector_option stylesheet styleable     Attr_names.place in
   let width            = get_property_vector_option ~value_of_n:wh_value_of_n stylesheet styleable     Attr_names.width in
   let height           = get_property_vector_option ~value_of_n:wh_value_of_n stylesheet styleable     Attr_names.height in
+  let expand           = get_property_vector stylesheet styleable            Attr_names.expand in
   let anchor           = get_property_vector stylesheet styleable            Attr_names.anchor in
   let grid             = get_property_int4_option  ~value_of_n:grid_value_of_n stylesheet styleable     Attr_names.grid in
   let z_index          = get_property_float  stylesheet styleable            Attr_names.z_index in
@@ -195,7 +195,7 @@ let make_layout_hdr stylesheet styleable =
   let border_round     = get_property_float_option  stylesheet styleable     Attr_names.border_round in
 (* content_transform and content_inv_transform *)
 {
-  place; width; height; anchor; grid; z_index;
+  place; width; height; anchor; expand; grid; z_index;
   padding; border; margin; border_fill; border_color; border_round; magnets_per_side;
 }
 
@@ -215,26 +215,18 @@ let is_placed t =
 (*f expand_bbox - expand a bbox by the padding, border and margin *)
 let expand_bbox t bbox = Rectangle.(expand (expand (expand bbox t.padding) t.border) t.margin)
 
-(*t t_grid_dimension *)
-(*    let gather_place content_layout_bbox_list = 
-      let acc_grid acc (layout, bbox) =
-        let (w,h) = Primitives.Rectangle.get_wh bbox in
-        let (px,py) = layout.place in
-        let (ax,ay) = layout.anchor in
-        else acc
-      in
-      List.fold_left acc_grid [] content_layout_bbox_list
- *)
-
+(*m GridDimension module *)                     
 module GridDimension = struct
-type t = {
-    grid : Grid.t;
-    start_index : int;
-    last_index : int;
-    expansion : float array;
-  }
+  (*t t *)
+  type t = {
+      grid : Grid.t;
+      start_index : int;
+      last_index : int;
+      expansion : float array;
+    }
 
-let make expand_default expand grid_cell_data =
+  (*f make expand_default -> expand -> grid_cell_data -> t *)
+  let make expand_default expand grid_cell_data =
     let grid = Grid.make grid_cell_data in
     (* Printf.printf "Grid %s\n" (Grid.str grid); *)
     let find_first_last_index (f,l) (s,n,_) =
@@ -256,38 +248,43 @@ let make expand_default expand grid_cell_data =
     if (expand_total>0.) then Array.iteri (fun i v -> expansion.(i) <- v /. expand_total) expansion;
     {grid; start_index; last_index; expansion }
 
-let get_span t = (0., Grid.get_last_position t.grid)
+  (*f get_size t -> float *)
+  let get_size t = Grid.get_last_position t.grid
 
-type t_layout = {
-    start_index : int;
-    last_index : int;
-    position : float array;
-  }
+  (*t t_layout *)
+  type t_layout = {
+      start_index : int;
+      last_index : int;
+      positions : float array;
+    }
 
-let resize (t:t) w =
-  let n = t.last_index - t.start_index in
-  let position = Array.init (n+1) (fun i-> Grid.get_position t.grid (i+t.start_index)) in
-  let size     = Array.mapi (fun i _ -> position.(i+1) -. position.(i)) t.expansion in
-  let span = position.(n) in
-  let rec set_position extra i =
-    position.(i) <- position.(i)+.extra; (* do this for i==n *)
-    if (i<n) then (
-      let extra=extra +. (w-.span)*.t.expansion.(i) in
-      set_position extra (i+1)
-    )
-  in
-  set_position 0. 0;
-  (* Printf.printf "Grid resized %s\n" (Grid.str t.grid); *)
-  {start_index=t.start_index; last_index=t.last_index; position;}
-  
-let get_bbox tl s n =
-  let i0 = s - tl.start_index in
-  let i1 = i0+n in
-  let i0 = max i0 0 in (* i0 >= 0 *)
-  let i1 = min i1 (tl.last_index-tl.start_index) in (* i1 <= n *)
-  if (i1<=i0) then (0.,0.) else (tl.position.(i0), tl.position.(i1))
+  (*f resize_and_place : t -> center float -> size float -> t_layout *)
+  let resize_and_place (t:t) c (size:float) =
+    let n = t.last_index - t.start_index in
+    let positions = Array.init (n+1) (fun i-> Grid.get_position t.grid (i+t.start_index)) in
+    let slack     = size -. positions.(n) in
+    let rec set_position extra i =
+      positions.(i) <- positions.(i)+.extra; (* do this for i==n *)
+      if (i<n) then (
+        let extra=extra +. slack *. t.expansion.(i) in
+        set_position extra (i+1)
+      )
+    in
+    set_position (c -. size /. 2.) 0;
+    {start_index=t.start_index; last_index=t.last_index; positions;}
 
-let str t = Grid.str t.grid
+  (*f get_bbox t_layout -> s -> n -> float * float *)
+  let get_bbox tl s n =
+    let i0 = s - tl.start_index in
+    let i1 = i0+n in
+    let i0 = max i0 0 in (* i0 >= 0 *)
+    let i1 = min i1 (tl.last_index-tl.start_index) in (* i1 <= n *)
+    if (i1<=i0) then (0.,0.) else (tl.positions.(i0), tl.positions.(i1))
+
+  (*f str t -> string *)
+  let str t = Grid.str t.grid
+
+  (*f All done *)
 end
 
 (*m PlaceDimension
@@ -328,8 +325,7 @@ end
 type t = {
     props  : t_layout_properties;
     grids  : GridDimension.t * GridDimension.t;
-    places : PlaceDimension.t list;
-    min_bbox : t_rect;
+    des_geom : t_ref_bbox;
   }
 
 (*t t_transform *)
@@ -345,86 +341,98 @@ content_bbox      : t_rect; (* bounding box for content to be displayed in *)
 let default_translate = (0.,0.)
 let default_scale     = (1.,1.)
 
-(*f create : t_layout_properties -> (t_layout_properties * min_bbox) list -> t
+(*f create : t_layout_properties -> (t_layout_properties * t_desired_geometry) list -> t
 
   Create the appropriate layout for the content (not this element) and determine the min_bbox given properties of this
   and the properties and min_bbox of contents
+
+  Start off with no desired placed geometry
+  If a child has a grid then add its dimensions to the grid_x and grid_y
+  Else if it is placed then its (ref,bbox) contributes as (bbox rel to ref + place)
+
+  Calculate the required width/height for the grid (if any)
+
+  Create final bbox that is centred on placed bbox center; (0,0) if none
+  Final geometry is reference point place centre, bbox final bbox
  *)
-let create props children_props_bbox =
+let build_layout_data acc (cp,des_geom) =
+  let (gcl, grl, place_bbox) = acc in
+  match cp.grid with
+  | None -> (
+  (* if it has a placement  then not 0,0 ...*)
+    let placement = (0., 0.) in
+    let child_bbox = Primitives.Rectangle.translate (Desired_geometry.get_drext des_geom) placement in
+    let place_bbox = Primitives.Rectangle.union place_bbox child_bbox in
+    (gcl, grl, place_bbox)
+  )
+  | Some (cs,rs,cw,rw) -> (
+    let (_,_,w,h) = Desired_geometry.get_cwh des_geom in
+    let gcl = (cs,cw,w)::gcl in
+    let grl = (rs,rw,h)::grl in
+    (gcl, grl, place_bbox)
+  )
+
+let create props children_props_geom =
   let expand_default = 1. in
   let expand = [] in
-  let build_grid_data acc ((cp,bbox) : (t_layout_properties * t_rect))  =
-    if (is_placed cp) then acc else (
-        let (cs,rs,cw,rw) = (match cp.grid with | None->(0,0,0,0) | Some x->x) in
-        let (w, h) = Primitives.Rectangle.get_wh bbox in
-        let (cl, rl) = acc in
-        ((cs,cw,w)::cl), ((rs,rw,h)::rl)
-    )
-  in
-  let (gcdx, gcdy) = List.fold_left build_grid_data ([],[]) children_props_bbox in
+  let (gcdx, gcdy, place_bbox) = List.fold_left build_layout_data ([],[],Primitives.Rectangle.zeros) children_props_geom in
   let grids  = List.map (GridDimension.make expand_default expand) [gcdx; gcdy] in
-  let places = List.map (fun i -> PlaceDimension.make children_props_bbox i) [0; 1] in
-  let grid_spans  = List.map GridDimension.get_span  grids  in
-  let place_spans = List.map PlaceDimension.get_span places in
-  let (glx,grx) = List.hd  grid_spans in    
-  let (gby,gty) = List.nth grid_spans 1 in    
-  let (plx,prx) = List.hd  place_spans in    
-  let (pby,pty) = List.nth place_spans 1 in
+  let grid_sizes  = List.map GridDimension.get_size  grids  in
+  let gw = List.hd  grid_sizes in    
+  let gh = List.nth grid_sizes 1 in    
   let grids = List.(hd grids, nth grids 1) in
-  (* Printf.printf "grid bbox %f,%f,%f,%f place bbox %f,%f,%f,%f\n" glx gby grx gty plx pby prx pty; *)
-  let min_bbox = Primitives.Rectangle.union (glx,gby,grx,gty) (plx,pby,prx,pty) in
-  let (mcx,mcy,mw,mh) = Primitives.Rectangle.get_cwh min_bbox in
-  let mw = props_min_max props.width  mw in
-  let mh = props_min_max props.height mh in
-  let min_bbox = Primitives.Rectangle.of_cwh (mcx, mcy, mw, mh) in
-  {props; grids; places; min_bbox;}
+  let (pcx,pcy,pw,ph) = Primitives.Rectangle.get_cwh place_bbox in
+  let cont_w = max gw pw in
+  let cont_h = max gh ph in
+  let cont_w = props_min_max props.width  cont_w in
+  let cont_h = props_min_max props.height cont_h in
+  let min_bbox = Primitives.Rectangle.of_cwh (pcx, pcy, cont_w, cont_h) in
+  let des_geom = Desired_geometry.make (pcx,pcy) min_bbox in
+  {props; grids; des_geom;}
 
 (*f get_z_index - get the z_index *)
 let get_z_index t = t.props.z_index
 
-(*f get_min_bbox - get the minimum bbox required by the content given grid and placemet (previously created as t) *)
-let get_min_bbox t = t.min_bbox
+(*f get_desired_geometry - get the minimum bbox required by the content given grid and placemet (previously created as t) *)
+let get_desired_geometry t = t.des_geom
 
-(*f layout_within_bbox - If bbox is bigger than min and expanding then expand; remember translation and scaling
+(*f layout_within_bbox
+  shrink content bbox by padding/border/margin?
 
-shrink content bbox by padding/border/margin?
+  we then have bbox_cx, bbox_w, des_w, des_ref_x, exp_x, anch_x
 
- let cs = content size (after content transform)
- let ds = display space
- let blank = ds - cs
- let dby = display bottom y
- let content (presumably cby=post-transform) be placed at by = dby + blank*anchor
- hence translate a content y is placed at (content transform y)-cby + dby + blank*anchor
- hence translation to be applited to (content transform y) is dby-cby + (ds-cs)*anchor
+  We want:
+    cnt_w  = des_x + (bbox_w-des_w)*exp_x. But what about cnt_ref_x?
+    cnt_cx = bbox_cx + (bbox_w-cnt_w)*anch_x
+
  *)
-let layout_within_bbox t bbox = 
-    let border_bbox = Primitives.Rectangle.(shrink bbox t.props.margin) in
-    let padded_bbox = Primitives.Rectangle.(shrink border_bbox t.props.border) in
-    let internal_bbox = Primitives.Rectangle.(shrink padded_bbox t.props.padding) in
-    (* dcx,dcy , dw,dh is center/size of the bbox to layout in after margin reduction *)
-    let (dcx,dcy,dw,dh) = Primitives.Rectangle.get_cwh internal_bbox in
-    (* ccx,ccy , cw,ch is center/size of the min bbox for our contents *)
-    let (ccx,ccy,cw,ch) = Primitives.Rectangle.get_cwh t.min_bbox in
-    (* should determine content layout w/h - assume same as now - but could expand it *)
-    (* if expand *)
-    let cw=dw in
-    let ch=dh in
-    (* So spare space can be determined - presumably +ve *)
-    let (slack_x,slack_y) = ((dw-.cw),(dh-.ch)) in
-    (* adjust ccx and ccy appropriately - depends on anchor coord *)
-    (* ax,ay is the anchor coordinates - i.e. where (ccx,ccy) is anchored - ignore for now *)
-    let (ax,ay) = (0.,0.) in
-    (*  *)
-    let ccx = dcx +. slack_x *. ax in
-    let ccy = dcy +. slack_y *. ay in
-    let content_bbox = Primitives.Rectangle.of_cwh (ccx,ccy,cw,ch) in
-    let translate = default_translate in
-    let scale     = default_scale in
-    let (gx, gy) = t.grids in
-    let gx = GridDimension.resize gx dw in
-    let gy = GridDimension.resize gy dh in
-    let grids = (gx, gy) in
-    let transform = {translate; scale; bbox; content_bbox; grids;} in (* bbox is used for the border generation - should include updated grid *)
+let layout_within_bbox t bbox =
+  let resize_and_place c size exp anch des_size des_ref =
+    let unexpanded_slack_size = size -. des_size in
+    let cnt_size = des_size +. exp *. unexpanded_slack_size in
+    let expanded_slack_size = size -. cnt_size in
+    let cnt_c   = c +. anch *. expanded_slack_size /. 2. in
+    let cnt_ref = des_ref in
+    (cnt_c, cnt_size, cnt_ref)
+  in
+  let border_bbox = Primitives.Rectangle.(shrink bbox t.props.margin) in
+  let padded_bbox = Primitives.Rectangle.(shrink border_bbox t.props.border) in
+  let internal_bbox = Primitives.Rectangle.(shrink padded_bbox t.props.padding) in
+  let (anchor_x,anchor_y) = t.props.anchor in
+  let (expand_x, expand_y) = t.props.expand in        
+  let (bbox_cx,bbox_cy,bbox_w,bbox_h) = Primitives.Rectangle.get_cwh internal_bbox in
+  let des_bbox = Desired_geometry.get_bbox t.des_geom in
+  let (des_cx,des_cy,des_w,des_h) = Primitives.Rectangle.get_cwh des_bbox in
+  let (ccx, cw, crx) = resize_and_place bbox_cx bbox_w expand_x anchor_x des_w des_cx in (* should use des_rx *)
+  let (ccy, ch, cry) = resize_and_place bbox_cy bbox_h expand_y anchor_y des_h des_cy in (* should use des_ry *)
+  let content_bbox = Primitives.Rectangle.of_cwh (ccx,ccy,cw,ch) in
+  let translate = default_translate in
+  let scale     = default_scale in
+  let (gx, gy) = t.grids in
+  let gx = GridDimension.resize_and_place gx ccx cw in
+  let gy = GridDimension.resize_and_place gy ccy ch in
+  let grids = (gx, gy) in
+  let transform = {translate; scale; bbox; content_bbox; grids;} in (* bbox is used for the border generation - should include updated grid *)
     (* Printf.printf "Layout_within_bbox %s int bbox %s min bbox %s slack %f,%f returns content %s \n" (Primitives.Rectangle.str bbox) (Primitives.Rectangle.str internal_bbox) (Primitives.Rectangle.str t.min_bbox) slack_x slack_y (Primitives.Rectangle.str content_bbox); *)
     let magnets =
       let (x0,y0,x1,y1)=bbox in
@@ -450,9 +458,9 @@ let layout_within_bbox t bbox =
                       ] in
     (transform, content_bbox, layout_pl)
 
-let get_bbox_element t tr cp min_bbox = 
+let get_geom_element t tr cp des_geom = 
   let (x0,y0,x1,y1) =
-    if (is_placed cp) then min_bbox else (
+    if (is_placed cp) then (Desired_geometry.get_bbox des_geom) else (
       let (cs,rs,cw,rw) = (match cp.grid with | None->(0,0,0,0) | Some x->x) in
       let (gx, gy) = tr.grids in
       let (x0,x1) = GridDimension.get_bbox gx cs cw in
