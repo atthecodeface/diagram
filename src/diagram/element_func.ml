@@ -402,8 +402,8 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
       (w, h)
 
     (*f layout_elements *)
-    let layout_elements page_bbox etb =
-      let lt  = make_layout_within_bbox etb page_bbox in
+    let layout_elements page_geom etb =
+      let lt  = make_layout_with_geom etb page_geom in
       let gt  = finalize_geometry [] lt in
       gt
 

@@ -76,7 +76,7 @@ let main () =
   let etb = prepare_elements stylesheet b in
   let (w,h) = prepared_size etb in
   let page_bbox = (0.,0.,w,h) in
-  let gt = layout_elements page_bbox etb in
+  let gt = layout_elements (Desired_geometry.make (w/.2.,h/.2.) page_bbox) etb in
   match args.svg_filename with
   | Some s -> (
     let (must_close_oc,oc) = if String.equal s "-" then (false,stdout) else (true,open_out s) in
