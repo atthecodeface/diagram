@@ -8,5 +8,8 @@
 *.cmx
 *.cmxa
 *.merlin
+*.svg
+*.install
+*.pdf
 _build
 
