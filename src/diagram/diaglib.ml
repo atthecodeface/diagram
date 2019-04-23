@@ -74,6 +74,8 @@ let from_structured_doc f =
 
 let create_stylesheet = Diagram_element.create_stylesheet
 let pp_element = Diagram_element.pp_element
+let pp_desired = Diagram_element.pp_desired
+let pp_layout  = Diagram_element.pp_layout
 let pp_geometry = Diagram_element.pp_geometry
 let prepare_elements = Diagram_element.prepare_elements
 let prepared_size = Diagram_element.get_prepared_size

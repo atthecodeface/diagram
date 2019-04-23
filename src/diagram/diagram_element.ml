@@ -80,11 +80,11 @@ module DiagramElement = struct
     | RPath (e,r)      -> Path.get_desired_geometry e r
     | RBox  (e,r)      -> Box.get_desired_geometry  e r
 
-  let make_layout_within_bbox rt (bbox : t_rect) = 
+  let make_layout_with_geometry rt (geom: t_ref_bbox) = 
     match rt with
-    | RText (e,r)  -> let (l,pl) = Text.make_layout_within_bbox e r bbox in (LText (e,r,l), pl)
-    | RPath (e,r)  -> let (l,pl) = Path.make_layout_within_bbox e r bbox in (LPath (e,r,l), pl)
-    | RBox  (e,r)  -> let (l,pl) = Box.make_layout_within_bbox  e r bbox in (LBox  (e,r,l), pl)
+    | RText (e,r)  -> let (l,pl) = Text.make_layout_with_geometry  e r geom in (LText (e,r,l), pl)
+    | RPath (e,r)  -> let (l,pl) = Path.make_layout_with_geometry  e r geom in (LPath (e,r,l), pl)
+    | RBox  (e,r)  -> let (l,pl) = Box.make_layout_with_geometry   e r geom in (LBox  (e,r,l), pl)
 
   let finalize_geometry lt res = 
     match lt with

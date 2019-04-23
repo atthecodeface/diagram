@@ -4,6 +4,7 @@ all: diagram
 diagram:
 	jbuilder build ./_build/default/src/diagram/diagram_top.exe
 	./_build/default/src/diagram/diagram_top.exe --f examples/pipeline.dml examples/pipeline.dss --svg pipeline.svg
+	./_build/default/src/diagram/diagram_top.exe --f examples/text.dml     examples/example.dss  --svg text.svg
 
 client:
 	jbuilder build ./_build/default/src/example_client/example_client.exe

@@ -1,0 +1,5 @@
+; a desired geometry is a rectangular bounding box with a reference point (usually within that)
+; A rotation, scaling and translation may be applied to this
+; This leads to a new, axis-aligned rectangular bounding box which may not include the reference point
+; This has margin, border, and padding applied to lead to a new box
+

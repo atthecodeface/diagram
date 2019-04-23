@@ -1,0 +1,28 @@
+; table is 7 by 7
+; padding is row/cols 1 and 7
+; border is row/cols 2 and 6
+; margin is row/cols 3 and 5
+; content is 4,4
+#text class=content grid=4,4 "Content"
+#text class="label" grid=1,1,7,1 "Padding"
+#text class="label" grid=1,7,7,1 "Padding"
+#text class="label" grid=2,2,5,1 "Border"
+#text class="label" grid=2,6,5,1 "Border"
+#text class="label" grid=3,3,3,1 "Margin"
+#text class="label" grid=3,5,3,1 "Margin"
+
+#text class=padding grid=1,1,7,1
+#text class=padding grid=1,1,1,7
+#text class=padding grid=1,7,7,1
+#text class=padding grid=7,1,1,7
+
+#text class=border grid=2,2,5,1
+#text class=border grid=2,2,1,5
+#text class=border grid=2,6,5,1
+#text class=border grid=6,2,1,5
+
+#text class=margin grid=3,3,3,1
+#text class=margin grid=3,3,1,3
+#text class=margin grid=3,5,3,1
+#text class=margin grid=5,3,1,3
+

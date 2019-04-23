@@ -59,7 +59,7 @@ module type LayoutElementType = sig
     val styles       : (string * Stylesheet.Value.t_styleable_type * Stylesheet.Value.t_styleable_value * bool) list
     val resolve_styles : et -> t_style_resolver -> (rt * t_element_properties)
     val get_desired_geometry : et -> rt -> t_ref_bbox
-    val make_layout_within_bbox : et -> rt -> t_rect -> (lt * t_element_properties)
+    val make_layout_with_geometry : et -> rt -> t_ref_bbox -> (lt * t_element_properties)
     val finalize_geometry : et -> rt -> lt -> t_style_resolver -> gt
     val render_svg   : et -> rt -> lt -> gt -> float -> Svg.t list
 end
@@ -79,7 +79,7 @@ module type LayoutElementAggrType = sig
     val type_name_gt  : gt -> string
     val resolve_styles : et -> t_style_resolver -> (rt * t_element_properties)
     val get_desired_geometry : rt -> t_ref_bbox
-    val make_layout_within_bbox : rt -> t_rect -> (lt * t_element_properties)
+    val make_layout_with_geometry : rt -> t_ref_bbox -> (lt * t_element_properties)
     val finalize_geometry : lt -> t_style_resolver -> gt
     val render_svg   : gt -> float -> Svg.t list
 end

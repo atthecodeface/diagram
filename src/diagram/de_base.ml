@@ -22,7 +22,7 @@ open Types
 
 let styles = Stylesheet.Value.[ (Attr_names.classes,         St_token_list,  sv_none_token_list, false);
                                 (Attr_names.eval,            St_string,      sv_none_string, false);
-                                (Attr_names.anchor,          (St_floats 2),  Sv_floats (2,[|0.5;0.5;|]), false);
+                                (Attr_names.anchor,          (St_floats 2),  Sv_floats (2,[|0.;0.;|]), false);
                                 (Attr_names.expand,          (St_floats 2),  Sv_floats (2,[|0.;0.;|]), false);
                                 (Attr_names.place,           (St_floats 2),  sv_none_floats, false);
                                 (Attr_names.grid,            St_int_arr ,    sv_none_int_arr, false);

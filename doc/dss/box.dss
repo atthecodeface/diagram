@@ -1,0 +1,13 @@
+#style id=padding border=2. border_color="0.8 0.8 0.8"  border_fill="0.8 0.8 0.8" z_index=-1
+#style id=border  border=2. border_color="0.7 0.7 0.7"  border_fill="0.7 0.7 0.7" z_index=-1
+#style id=margin  border=2. border_color="0.6 0.6 0.6"  border_fill="0.6 0.6 0.6" z_index=-1
+#style id=label   font_size=2.
+#style id=content font_size=8.
+
+
+#rule class=padding style=padding
+#rule class=border style=border
+#rule class=margin style=margin
+
+#rule class=label style=label
+#rule class=content style=content

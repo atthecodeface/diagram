@@ -39,8 +39,8 @@ module LayoutElementFunc (E:LayoutElementType) = struct
       (rt,pl@layout_pl)
     )
   let get_desired_geometry = E.get_desired_geometry
-  let make_layout_within_bbox et rt bbox = (
-      let (lt,pl) = E.make_layout_within_bbox et rt bbox in
+  let make_layout_with_geometry et rt geom = (
+      let (lt,pl) = E.make_layout_with_geometry et rt geom in
       (lt,pl)
     )
 

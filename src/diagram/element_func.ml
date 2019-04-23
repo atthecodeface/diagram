@@ -110,8 +110,8 @@ module TypeFunc(LE : LayoutElementAggrType) = struct
       ltr    : Layout.t_transform;
       eval : Eval.t_eval;
       content_lt : t_layout list;
-      bbox : t_rect; (* for the thing *)
-      content_bbox : t_rect; (* For all the content_lt if there are any *)
+      geom : t_ref_bbox; (* for the thing *)
+      content_geom : t_ref_bbox; (* For all the content_lt if there are any *)
     }
 
   (*t t_finalized_geometry - Fully resolved geometry type with evaluations completed *)
@@ -121,7 +121,7 @@ module TypeFunc(LE : LayoutElementAggrType) = struct
       layout : Layout.t;
       ltr    : Layout.t_transform;
       content_gt : t_finalized_geometry list;
-      bbox : t_rect;
+      geom : t_ref_bbox;
     }
 
 end
@@ -220,13 +220,19 @@ module DesiredGeometryFunc (LE : LayoutElementAggrType) = struct
     let layout        = layout_content_create rt content_etb in
     let content_geom  = Layout.get_desired_geometry layout in
 
-    let (_,_,ew,eh)  = Desired_geometry.get_cwh element_geom in
+    let (ecx,ecy,ew,eh)  = Desired_geometry.get_cwh element_geom in
     let (_,_,cw,ch)  = Desired_geometry.get_cwh content_geom in
     let mw = max cw ew in
     let mh = max ch eh in
     let merged_bbox   = Rectangle.of_cwh (0.,0.,mw,mh) in
     let min_bbox      = Layout.expand_bbox rt.layout_properties merged_bbox in
-    let des_geom = Desired_geometry.(make (get_ref element_geom) min_bbox) in
+    (* But can do ref point relative to centre *)
+    let (erx,ery) = Desired_geometry.get_ref element_geom in
+    let (mbcx, mbcy, _, _) = Rectangle.get_cwh min_bbox in
+    let drx =erx -. ecx +. mbcx in
+    let dry =ery -. ecy +. mbcy in
+    let des_ref = (drx, dry) in
+    let des_geom = Desired_geometry.(make des_ref min_bbox) in
     let properties = rt.properties in
     { th=rt.th; rt=rt.rt; properties; layout_properties=rt.layout_properties; eval=rt.eval; content_geom; element_geom; des_geom; layout; content_etb }
 
@@ -235,12 +241,16 @@ module DesiredGeometryFunc (LE : LayoutElementAggrType) = struct
 
   (*f pp *)
   let rec pp ppf (etb:t) =
+    Format.fprintf ppf "@[<v 3>";
     pp_open ppf (LE.type_name_rt etb.rt) etb.th;
-    Format.fprintf ppf "ele_bbox:%s "  (Desired_geometry.str etb.element_geom);
-    Format.fprintf ppf "cont_bbox:%s " (Desired_geometry.str etb.content_geom);
-    Format.fprintf ppf "min_bbox:%s "  (Desired_geometry.str etb.des_geom);
+    Format.fprintf ppf "element geom: %s " (Desired_geometry.str etb.element_geom);
+    Format.fprintf ppf "children geom:%s " (Desired_geometry.str etb.content_geom);
+    Format.fprintf ppf "combined geom (inc border etc): %s " (Desired_geometry.str etb.des_geom);
+    Format.fprintf ppf "@,";
     List.iter (pp ppf) etb.content_etb;
-    pp_close ppf ()
+    pp_close ppf ();
+    Format.fprintf ppf "@]@,";
+    ()
 
 end
 
@@ -249,24 +259,29 @@ module LayoutFunc (LE : LayoutElementAggrType) = struct
   module Types=TypeFunc(LE)
   type t = Types.t_layout
 
-  (*f make_layout_within_bbox - make lt from etb *)
-  let rec make_layout_within_bbox (etb:Types.t_desired_geometry) bbox : t= 
-    let (ltr, content_bbox, layout_properties) = Layout.layout_within_bbox etb.layout bbox in
-    let (lt, properties) = LE.make_layout_within_bbox etb.rt content_bbox in
+  (*f make_layout_with_geometry - make lt from etb *)
+  let rec make_layout_with_geometry (etb:Types.t_desired_geometry) geom : t= 
+    let (ltr, content_geom, layout_properties) = Layout.layout_with_geometry etb.layout geom in
+    let (lt, properties) = LE.make_layout_with_geometry etb.rt content_geom in
     let layout_content_element (x : Types.t_desired_geometry) =
-      let bbox = Layout.get_geom_element etb.layout ltr x.layout_properties x.des_geom in
-      make_layout_within_bbox x bbox
+      let geom = Layout.get_geom_element etb.layout ltr x.layout_properties x.des_geom in
+      make_layout_with_geometry x geom
     in
     let content_lt = List.map layout_content_element etb.content_etb in
     let properties = properties @ layout_properties @ etb.properties in
-    { th=etb.th; lt; properties; eval=etb.eval; layout=etb.layout; ltr; content_lt; bbox; content_bbox}
+    { th=etb.th; lt; properties; eval=etb.eval; layout=etb.layout; ltr; content_lt; geom; content_geom}
 
   (*f pp *)
   let rec pp ppf (lt:t) =
+    Format.fprintf ppf "@[<v 3>";
     pp_open ppf (LE.type_name_lt lt.lt) lt.th;
-    Format.fprintf ppf "bbox:%s" (Rectangle.str lt.bbox);
+    Format.fprintf ppf "geom:%s " (Desired_geometry.str lt.geom);
+    Format.fprintf ppf "content geom:%s " (Desired_geometry.str lt.content_geom);
+    Format.fprintf ppf "@,";
     List.iter (pp ppf) lt.content_lt;
-    pp_close ppf ()
+    Format.fprintf ppf "@]@,";
+    pp_close ppf ();
+    ()
 
 end
 
@@ -278,10 +293,14 @@ module FinalizedGeometryFunc (LE : LayoutElementAggrType) = struct
 
   (*f pp *)
   let rec pp ppf (gt:t) =
+    Format.fprintf ppf "@[<v 3>";
     pp_open ppf (LE.type_name_gt gt.gt) gt.th;
-    Format.fprintf ppf "bbox:%s" (Rectangle.str gt.bbox);
+    Format.fprintf ppf "finalized geometry:%s " (Desired_geometry.str gt.geom);
+    Format.fprintf ppf "@,";
     List.iter (pp ppf) gt.content_gt;
-    pp_close ppf ()
+    Format.fprintf ppf "@]@,";
+    pp_close ppf ();
+    ()
 
   (*f finalize_value ?default -> 'a rvfn -> 'a evfn -> lt -> string -> 'a *)
   let finalize_value ?default rvfn evfn (lt:Types.t_layout) s =
@@ -332,7 +351,7 @@ module FinalizedGeometryFunc (LE : LayoutElementAggrType) = struct
     ignore (Eval.resolve_all tres lt rev_stack);
     let resolver = finalize_resolver lt in
     let gt = LE.finalize_geometry lt.lt resolver in
-    { th=lt.th; gt=gt; layout=lt.layout; ltr=lt.ltr; content_gt; bbox=lt.bbox;}
+    { th=lt.th; gt=gt; layout=lt.layout; ltr=lt.ltr; content_gt; geom=lt.geom;}
 
   (*f find_zindices - add z_indices to the set *)
   let rec find_zindices z_indices (gt:t)  =
@@ -365,12 +384,13 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     let create_stylesheet = Styled.create_stylesheet
     let pp_element  = Base.pp
     let pp_layout   = Layout.pp
+    let pp_desired  = DesiredGeometry.pp
     let pp_geometry = FinalizedGeometry.pp
     let make_styleable = Styled.make_styleable
     let resolve_styles = ResolvedStyled.resolve_styles
     let make_desired_geometry = DesiredGeometry.make
     let get_desired_geometry = DesiredGeometry.get_des_geom
-    let make_layout_within_bbox = Layout.make_layout_within_bbox
+    let make_layout_with_geometry = Layout.make_layout_with_geometry
     let finalize_geometry = FinalizedGeometry.finalize_geometry
     let render_svg gt =
       let z_indices = FloatSet.empty in
@@ -382,7 +402,7 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
     (*f show_layout *)
     type gt = FinalizedGeometry.t
     let rec show_layout (gt:gt) indent =
-      Printf.printf "%sid '%s' : bbox '%s'\n" indent gt.th.id (Rectangle.str gt.bbox);
+      Printf.printf "%sid '%s' : bbox '%s'\n" indent gt.th.id (Desired_geometry.str gt.geom);
       let indent = String.concat "" ["  "; indent] in
       List.iter (fun x -> show_layout x indent) gt.content_gt
 
@@ -403,9 +423,9 @@ module ElementFunc (LE : LayoutElementAggrType) = struct
 
     (*f layout_elements *)
     let layout_elements page_geom etb =
-      let lt  = make_layout_with_geom etb page_geom in
+      let lt  = make_layout_with_geometry etb page_geom in
       let gt  = finalize_geometry [] lt in
-      gt
+      (lt, gt)
 
     (*f All done *)
 

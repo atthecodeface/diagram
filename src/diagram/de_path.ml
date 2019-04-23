@@ -2,7 +2,7 @@ open Types
 include De_base
 type et = int
 type rt = {color:string; markers:string; stroke_width:float; coords:float array;} (* coords if provided statically *)
-type lt = t_rect
+type lt = t_ref_bbox
 type gt = {
     coords : float array;
   }
@@ -54,7 +54,7 @@ let get_desired_geometry et (rt:rt) =
   let bbox = bbox_x (0.,0.,0.,0.) (Array.length rt.coords) rt.coords 0 in
   Desired_geometry.make (0.,0.) bbox
 
-let make_layout_within_bbox et rt bbox = (bbox,[])
+let make_layout_with_geometry et rt geom = (geom,[])
 let finalize_geometry et rt lt (resolver:t_style_resolver) =
   let coords = resolver.value_as_floats Attr_names.coords in
   {coords}

@@ -154,7 +154,5 @@ let svg_doc version contents bbox =
       (attribute_rectangle "viewBox" bbox);
       (attribute_string "preserveAspectRatio" "xMidYMid");
       (attribute_string "fill-rule" "evenodd");
-      (attribute_float  "stroke-width" 28.222);
-      (attribute_string "stroke-linejoin" "round");
       ] in
     tag "svg" attributes contents []

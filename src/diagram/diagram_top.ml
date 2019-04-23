@@ -74,9 +74,20 @@ let main () =
   if must_close_f then (close_in f);
 
   let etb = prepare_elements stylesheet b in
+  (*
+  Format.(pp_set_mark_tags std_formatter true) ;
+  Format.(pp_set_print_tags std_formatter true) ;
+  Diaglib.pp_desired Format.std_formatter etb;
+  Format.(pp_print_flush std_formatter ());
+   *)
   let (w,h) = prepared_size etb in
   let page_bbox = (0.,0.,w,h) in
-  let gt = layout_elements (Desired_geometry.make (w/.2.,h/.2.) page_bbox) etb in
+  let (lt, gt) = layout_elements (Desired_geometry.make (w/.2.,h/.2.) page_bbox) etb in
+  (*
+  Diaglib.pp_layout Format.std_formatter lt;
+  Diaglib.pp_geometry Format.std_formatter gt;
+  Format.(pp_print_flush std_formatter ());
+   *)
   match args.svg_filename with
   | Some s -> (
     let (must_close_oc,oc) = if String.equal s "-" then (false,stdout) else (true,open_out s) in

@@ -38,11 +38,12 @@ type rt = {
     line_spacing : float;
     text_height : float;
     text_widths : (float * string) list;
+    des_geom : t_ref_bbox;
   (* anchor / alignment *)
   }
 
 (*t lt - layout width and height, using resolved parameters *)
-type lt = t_rect (* Rectangle to place text within *)
+type lt = t_ref_bbox (* Rectangle to place text within *)
 
 (*t gt - finalized geometry for rendering *)
 type gt = {
@@ -77,7 +78,10 @@ let resolve_styles et (resolver:t_style_resolver) =
   let text_widths = List.map (fun text -> (Font.width_of_text font size text), text) et.text in
   let text_height = Font.height_of_text font size in
   let line_spacing = Font.text_spacing font size in
-  let rt = {font; size; align; line_spacing; text_height; text_widths} in
+  let max_width = List.fold_left (fun acc (w,_) -> if (w>acc) then w else acc) 0. text_widths in
+  let height = ((float et.num_lines) *. text_height) +. ((float (et.num_lines - 1)) *. line_spacing) in
+  let des_geom = Desired_geometry.make (max_width *. (1.+.align)/.2.,height/.2.) (0.,0.,max_width,height) in
+  let rt = {font; size; align; line_spacing; text_height; text_widths; des_geom} in
   (rt, [])
 
 (*f get_desired_geometry : et -> rt -> t_desired_geometry
@@ -88,36 +92,32 @@ let resolve_styles et (resolver:t_style_resolver) =
 
   If the ref point is explicitly placed somewhere then
  *)
-let get_desired_geometry et rt =
-  let max_width = List.fold_left (fun acc (w,_) -> if (w>acc) then w else acc) 0. rt.text_widths in
-  let height = ((float et.num_lines) *. rt.text_height) +. ((float (et.num_lines - 1)) *. rt.line_spacing) in
-  Desired_geometry.make_wh max_width height
+let get_desired_geometry et rt = rt.des_geom
 
 (*a Functions for layout *)
-(*f make_layout_within_bbox : et -> rt -> ref pt * bbox `-> lt * properties
+(*f make_layout_with_geometry : et -> rt -> t_ref_bbox `-> lt * properties
   ref ptr and bbox are in the parent coordinate space.
   bbox shows where the entirety of the layout should fit within, and ref_ptr is where the layout ref_ptr should be placed
   The layout should not scale up to fit the bbox if there is room; it should just use more space if it requires it, otherwise
   leave space blank.
  *)
-let make_layout_within_bbox et rt bbox : lt * t_element_properties = 
-  (* bbox is in the coordinate space for us to do a layout in  can now do centering, and could prepare for justification. *)
-  (* Printf.printf "\nText layout bbox %s\n\n" (Primitives.Rectangle.str bbox); *)
-  (bbox, [])
+let make_layout_with_geometry et rt geom : lt * t_element_properties = 
+  (* geometry gives us the reference point in parent coordinates and the bbox *)
+  (geom, [])
 
 (*a Finsalize geometry and rendering *)
 (*f finalize_geometry et -> rt -> lt -> t_style_resolver -> gt
   Using alignment and ref point translation determine x,y for each line
  *)
-let finalize_geometry et (rt:rt) lt (resolver:t_style_resolver) = 
+let finalize_geometry et (rt:rt) (lt:lt) (resolver:t_style_resolver) = 
   let color = resolver.value_as_color_string  ~default:"black" Attr_names.color in
-  let (x0,y0,x1,y1) = lt in
-  let (cx,w) = ( (x0+.x1)/.2., (x1-.x0)/.2. ) in
+  let (drx,dry) = Desired_geometry.get_ref rt.des_geom in
+  let (rx,ry) = Desired_geometry.get_ref lt in
+  (*let rx = rx -. drx in *)
+  let ry = ry -. dry in
   let text_xy i (w,text) =
-    let y = y0 +. (float i) *. (rt.line_spacing +. rt.text_height) +. rt.text_height in
-    if (rt.align<(-1.)) then (x0, y)
-    else if (rt.align>(1.)) then (x1, y)
-    else (cx+.w*.rt.align,y)
+    let y = ry +. (float i) *. (rt.line_spacing +. rt.text_height) +. rt.text_height in
+    (rx+.w*.rt.align,y)
   in
   let xys = List.mapi text_xy rt.text_widths in
   let text_anchor = if (rt.align<(-1.)) then "start" else if (rt.align>(1.)) then "end" else "middle" in

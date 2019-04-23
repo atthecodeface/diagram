@@ -1,4 +1,4 @@
-#box id=group font_size=3.0 magnets_per_side=5
+#box grid=0,0 id=group font_size=3.0 magnets_per_side=5
 ##text id=fetch  grid=0,0,1,1  class=pipe_stage "Fetch" 
 ##box  id=f2d    grid=0,1,1,1  class=pipe_gap
 ##text id=decode grid=0,2,1,1  class=pipe_stage "Decode" 

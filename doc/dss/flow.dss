@@ -1,0 +1,35 @@
+#style id=base stroke_width=0.5 color=green font_size=5.
+
+#style id=group      padding=1.5 border=0.1 border_color=black border_round=0.3
+#style id=box_border border=0.2 padding=0 margin=0.3 border_color=black border_fill=0.9,0.9,0.9 border_round=0.3
+
+#style id=box_in_out magnets_per_side=11 eval="in=.magnets 35 sub;in0=.magnets 37 sub;in1=.magnets 33 sub;out=.magnets 15 sub;"
+
+#style id=col_space width=10.
+#style id=ss_arrow markers="stub arr" stroke_width=0.5 color=red z_index=1.
+
+#apply style=base
+
+#rule tag=box style=box_in_out
+#rule tag=text style=base
+
+#rule class=col_space style=col_space
+#rule class=ss_arrow style=ss_arrow
+
+#rule id=ss
+##apply style=group
+
+#rule class=ss
+##apply style=box_border
+
+#rule id=stylesheet
+##apply style=box_border
+
+#rule id=diagram
+##apply style=box_border
+
+#rule id=layout
+##apply style=box_border
+
+#rule id=render
+##apply style=box_border
