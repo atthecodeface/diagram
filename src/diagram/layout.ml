@@ -236,7 +236,7 @@ let get_geom_element t tr cp des_geom =
     let (y0,y1) = Grid.get_layout_bbox tr.grids.(1) rs rw in
     let bbox = (x0,y0,x1,y1) in
     let (cx,cy,_,_) = Primitives.Rectangle.get_cwh bbox in
-    Printf.printf "get_geom_element %g,%g : %g,%g,%g,%g\n" cx cy x0 y0 x1 y1;
+    (* Printf.printf "get_geom_element %g,%g : %g,%g,%g,%g\n" cx cy x0 y0 x1 y1; *)
     Desired_geometry.make (cx,cy) bbox
   )
 
