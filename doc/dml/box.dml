@@ -6,10 +6,16 @@
 #text class=content grid=4,4 "Content"
 #text class="label" grid=1,1,7,1 "Padding"
 #text class="label" grid=1,7,7,1 "Padding"
+#text class="label vert" grid=1,1,1,7 "Padding"
+#text class="label vert2" grid=7,1,1,7 "Padding"
 #text class="label" grid=2,2,5,1 "Border"
 #text class="label" grid=2,6,5,1 "Border"
+#text class="label vert" grid=2,2,1,5 "Border"
+#text class="label vert2" grid=6,2,1,5 "Border"
 #text class="label" grid=3,3,3,1 "Margin"
 #text class="label" grid=3,5,3,1 "Margin"
+#text class="label vert" grid=3,3,1,3 "Margin"
+#text class="label vert2" grid=5,3,1,3 "Margin"
 
 #text class=padding grid=1,1,7,1
 #text class=padding grid=1,1,1,7

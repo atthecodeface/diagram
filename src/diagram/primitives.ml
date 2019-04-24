@@ -85,10 +85,10 @@ module Rectangle = struct
         let (r0,r1,r2,r3) = (max a0 b0, max a1 b1, min a2 b2, min a3 b3) in
         if ((r2<=r0) || (r3<=r1)) then zeros else (r0,r1,r2,r3)
       )
-    let translate r v =
+    let translate ?scale:(scale=1.) r v =
       let (xr, yr) = v in
       let (x0,x1,y0,y1) = r in
-      (x0 +. xr, y0 +. yr, x1 +. xr, y1 +. yr)
+      (x0 +. xr*.scale, y0 +. yr*.scale, x1 +. xr*.scale, y1 +. yr*.scale)
     let mk_fixed r = Fixed r
     let value x n =
       match x with

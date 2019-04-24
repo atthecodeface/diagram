@@ -37,10 +37,8 @@ type t_layout_properties = {
         border_color      : Primitives.Color.t;
         border_round      : float option; 
         magnets_per_side  : int; 
-       (* 
-    rotation
-    scale (x,y)
-*)
+        rotation          : float option; 
+        scale             : t_vector option; 
 }
 
 (*f make_layout_hdr stylesheet styleable - get actual data from the provided properties *)
@@ -68,6 +66,8 @@ let make_layout_hdr stylesheet styleable =
   let anchor           = get_property_vector stylesheet styleable            Attr_names.anchor in
   let grid             = get_property_int4_option  ~value_of_n:grid_value_of_n stylesheet styleable     Attr_names.grid in
   let z_index          = get_property_float  stylesheet styleable            Attr_names.z_index in
+  let rotation         = get_property_float_option  stylesheet styleable            Attr_names.rotation in
+  let scale            = get_property_vector_option  stylesheet styleable           Attr_names.scale in
   let padding          = get_property_rect  ~value_of_n:pbm_value_of_n stylesheet styleable            Attr_names.padding in
   let border           = get_property_rect  ~value_of_n:pbm_value_of_n stylesheet styleable            Attr_names.border in
   let margin           = get_property_rect  ~value_of_n:pbm_value_of_n stylesheet styleable            Attr_names.margin in
@@ -77,6 +77,7 @@ let make_layout_hdr stylesheet styleable =
 (* content_transform and content_inv_transform *)
 {
   place; width; height; anchor; expand; grid; z_index;
+  rotation; scale;
   padding; border; margin; border_fill; border_color; border_round; magnets_per_side;
 }
 
@@ -120,17 +121,13 @@ type t = {
 
 (*t t_transform *)
 type t_transform = {
-translate : t_vector;
-scale     : t_vector;
+translate : t_vector option;
 geom      : t_ref_bbox; (* bounding box to be displayed in - do border/fill of this *)
 content_geom   : t_ref_bbox; (* bounding box for content to be displayed in *)
     grids  : Grid.t_layout array;
   }
 
 (*a Toplevel Layout module *)
-let default_translate = (0.,0.)
-let default_scale     = (1.,1.)
-
 (*f create : t_layout_properties -> (t_layout_properties * t_desired_geometry) list -> t
 
   Create the appropriate layout for the content (not this element) and determine the min_bbox given properties of this
@@ -195,13 +192,21 @@ let layout_with_geometry t geom =
   let padded_geom   = Desired_geometry.(shrink border_geom t.props.border) in
   let internal_geom = Desired_geometry.(shrink padded_geom t.props.padding) in
   let content_geom  = Desired_geometry.fit_within internal_geom t.des_geom t.props.anchor t.props.expand in
-  let translate = default_translate in
-  let scale     = default_scale in
+  let (translate, content_geom) = match t.props.rotation with
+    | None -> (None, content_geom)
+    | Some f -> (
+      let cref = Desired_geometry.get_ref content_geom in
+      let bbox = Desired_geometry.get_cwh content_geom in
+      let translate = Some cref in
+      let geom = Desired_geometry.make (0.,0.) (Primitives.Rectangle.translate ~scale:(-1.) bbox cref) in
+      (translate, geom)
+    )
+  in
   let (ccx,ccy,cw,ch) = Desired_geometry.get_cwh content_geom in
   let gx = Grid.make_layout t.grids.(0) ccx cw in
   let gy = Grid.make_layout t.grids.(1) ccy ch in
   let grids = [|gx; gy|] in
-  let transform = {translate; scale; geom=geom; content_geom; grids;} in (* bbox is used for the border generation - should include updated grid *)
+  let transform = {translate; geom=geom; content_geom; grids;} in (* bbox is used for the border generation - should include updated grid *)
     let magnets =
       let (x0,y0,x1,y1)=Desired_geometry.get_bbox geom in
       if (t.props.magnets_per_side>1) then (
@@ -240,20 +245,29 @@ let get_geom_element t tr cp des_geom =
     Desired_geometry.make (cx,cy) bbox
   )
 
-let translate_string tr =
-    if tr.translate==default_translate then "" else 
-    let (dx,dy) = tr.translate in
-    Printf.sprintf "translate(%g %g)" dx dy
+let acc_translate tr acc =
+  match tr.translate with
+  | None -> acc
+  | Some (dx,dy) -> (Printf.sprintf "translate(%g,%g)" dx dy)::acc
 
-let scale_string tr =
-    if tr.scale==default_scale then "" else 
-    let (dx,dy) = tr.scale in
-    Printf.sprintf "scale(%g %g)" dx dy
+let acc_rotation t acc =
+  match t.props.rotation with
+  | None -> acc
+  | Some f -> (Printf.sprintf "rotate(%g)" f)::acc
 
-let add_transform_tag tr tags =
-    let t = translate_string tr in
-    let s = scale_string tr in
-    (Svg.attribute_string "transform" (String.concat " " [t; s])) :: tags
+let acc_scale t acc =
+  match t.props.scale with
+  | None -> acc
+  | Some (x,y) -> (Printf.sprintf "scale(%g,%g)" x y)::acc
+
+let add_transform_tag t tr tags =
+  let transform = [] in
+  let transform = acc_rotation  t  transform in
+  let transform = acc_scale     t  transform in
+  let transform = acc_translate tr transform in
+  match transform with
+  | [] -> tags
+  | _ -> (Svg.attribute_string "transform" (String.concat " " transform)) :: tags
 
 let path_ele t coords = String.concat " " (t::(List.map (Printf.sprintf "%g") coords))
 
@@ -308,4 +322,4 @@ let render_svg t tr id z_index make_element_svg svg_contents =
   in
     match svg_contents with 
     | [] -> []
-    | s -> [ Svg.tag "g" (add_transform_tag tr id_attrs) s []]
+    | s -> [ Svg.tag "g" (add_transform_tag t tr id_attrs) s []]

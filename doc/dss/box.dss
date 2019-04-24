@@ -2,6 +2,8 @@
 #style id=border  border=2. border_color="0.7 0.7 0.7"  border_fill="0.7 0.7 0.7" z_index=-1
 #style id=margin  border=2. border_color="0.6 0.6 0.6"  border_fill="0.6 0.6 0.6" z_index=-1
 #style id=label   font_size=2.
+#style id=vert     rotation=270
+#style id=vert2    rotation=90
 #style id=content font_size=8.
 
 
@@ -10,4 +12,6 @@
 #rule class=margin style=margin
 
 #rule class=label style=label
+#rule class=vert  style=vert
+#rule class=vert2 style=vert2
 #rule class=content style=content
