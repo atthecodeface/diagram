@@ -27,32 +27,27 @@ let resolve_styles et (resolver:t_style_resolver) =
 (*f bbox_x/y : bbox -> int -> float array -> bbox *)
 let rec bbox_x bbox n a = function
   | i when i>=n -> bbox
-  | 0 -> (a.(0),0.,a.(0),0.)
+  | 0 -> [|a.(0);0.;a.(0);0.|]
   | i -> (
-     let (minx,miny,maxx,maxy) = bbox in
      let x = a.(i) in
-     let minx = min x minx in
-     let maxx = max x maxx in
-     bbox_y (minx,miny,maxx,maxy) n a (i+1)
+     let minx = min x bbox.(0) in
+     let maxx = max x bbox.(2) in
+     bbox_y [|minx; bbox.(1); maxx; bbox.(3); |] n a (i+1)
   )
 and bbox_y bbox n a = function
   | i when i>=n -> bbox
-  | 1 -> (
-    let (minx,miny,maxx,maxy) = bbox in
-    minx,a.(1),maxx,a.(1)
-  )
+  | 1 -> ( [| bbox.(0); a.(1); bbox.(2); a.(1); |] )
   | i -> (
-     let (minx,miny,maxx,maxy) = bbox in
      let y = a.(i) in
-     let miny = min y miny in
-     let maxy = max y maxy in
-     bbox_x (minx,miny,maxx,maxy) n a (i+1)
+     let miny = min y bbox.(1) in
+     let maxy = max y bbox.(3) in
+     bbox_x [| bbox.(0); miny; bbox.(2); maxy; |] n a (i+1)
   )
 
 (*f get_desired_geometry : et -> rt -> t_ref_bbox *)
 let get_desired_geometry et (rt:rt) =
-  let bbox = bbox_x (0.,0.,0.,0.) (Array.length rt.coords) rt.coords 0 in
-  Desired_geometry.make (0.,0.) bbox
+  let bbox = bbox_x Primitives.Rectangle.zeros (Array.length rt.coords) rt.coords 0 in
+  Desired_geometry.make Primitives.Vector.zeros bbox
 
 let make_layout_with_geometry et rt geom = (geom,[])
 let finalize_geometry et rt lt (resolver:t_style_resolver) =

@@ -7,17 +7,16 @@ let str_type = function
   | Ev_floats (n,_) -> Printf.sprintf "floats[%d]" n
   | Ev_rect r -> "rect"
   | Ev_vector _ -> "vector"
-  | Ev_vectors (n,_,_) -> Printf.sprintf "vectors[%d]" n
+  | Ev_vectors (n,_) -> Printf.sprintf "vectors[%d]" n
   | Ev_string _ -> "string"
 
 let eval_value_of = function
   | Ev_float f -> Eval.value_of_float f
   | Ev_floats (n,arr) -> Eval.value_of_floats arr 0 n
   | Ev_rect r ->
-               let (x0,y0,x1,y1)=r in
-               Eval.value_of_floats2 [|x0;x1;x1;x0|] [|y0;y0;y1;y1|] 0 4
+               Eval.value_of_floats2 [|r.(0);r.(2);r.(2);r.(0)|] [|r.(1);r.(1);r.(3);r.(3)|] 0 4
   | Ev_vector (x,y) -> Eval.value_make_vector x y
-  | Ev_vectors (n,xs,ys) -> Eval.value_of_floats2 xs ys 0 n
+  | Ev_vectors (n,xys) -> Eval.value_of_floats_floats xys 0 n
   | _ -> Eval.no_value
 
 let as_float = function

@@ -5,7 +5,7 @@ Add support for human-markup input and output
 type t_attr = | StringAttr of (string * string)
               | FloatAttr of (string * float)
               | FloatsAttr of (string * (float array))
-              | RectangleAttr of (string * (float*float*float*float))
+              | RectangleAttr of (string * (float array))
 
 type t = {
 tag_type : string;
@@ -37,9 +37,8 @@ let attribute_text t =
   | StringAttr (n,v) -> Printf.sprintf "%s='%s'" n v
   | FloatAttr (n,v) -> Printf.sprintf "%s='%s'" n (string_of_float v)
   | FloatsAttr (n,v) -> Printf.sprintf "%s='%s'" n (String.concat " " (Array.fold_left (fun acc v->acc@[(string_of_float v)]) [] v))
-  | RectangleAttr (n,v) -> 
-    let (d0, d1, d2, d3) = v in
-    Printf.sprintf "%s='%s %s %s %s'" n (string_of_float d0) (string_of_float d1) (string_of_float d2) (string_of_float d3)
+  | RectangleAttr (n,r) -> 
+    Printf.sprintf "%s='%s %s %s %s'" n (string_of_float r.(0)) (string_of_float r.(1)) (string_of_float r.(2)) (string_of_float r.(3))
 
 let tag tag_type attributes contents cdata = { tag_type; attributes; contents; cdata; }
 

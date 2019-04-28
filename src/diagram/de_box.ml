@@ -6,7 +6,7 @@ type lt = t_ref_bbox
 type gt = lt
 
 let get_desired_geometry et rt =
-  Desired_geometry.make (0.,0.) Primitives.Rectangle.zeros
+  Desired_geometry.make Primitives.Vector.zeros Primitives.Rectangle.zeros
 
 let make _ = 0
 let resolve_styles et (resolver:t_style_resolver) =

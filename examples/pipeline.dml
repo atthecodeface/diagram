@@ -12,7 +12,7 @@
 ##text id=mresp  grid=0,10,1,1 class=pipe_stage "Memory" "response"
 ##box  id=f2d    grid=0,11,1,1 class=pipe_gap
 ##text id=rfw    grid=0,12,1,1 class=pipe_stage "Write register"
-##path id=f2darr class=pipe_arrow eval="coords=^.fetch.magnets 10 sub ^.decode.magnets 2 sub;"
+##path id=f2darr class=pipe_arrow eval="coords=^.fetch.magnets debug 10 sub ^.decode.magnets 2 sub;"
 ##path id=d2rarr class=pipe_arrow eval="coords=^.decode.magnets 10 sub ^.rfr.magnets 2 sub;"
 ##path id=r2aarr class=pipe_arrow eval="coords=^.rfr.magnets 10 sub ^.alu.magnets 2 sub;"
 ##path id=a2marr class=pipe_arrow eval="coords=^.alu.magnets 10 sub ^.mreq.magnets 2 sub;"

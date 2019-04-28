@@ -56,61 +56,152 @@ let th_make id =
 let value_rect = function | Rect r -> r | _ -> raise (Invalid_value "Expected rect")
 let value_int4 = function | Int4 r -> r | _ -> raise (Invalid_value "Expected int4")
 
+(*m Rectangle module *)
 module Rectangle = struct
-  type t = Uniform of float 
-               | Fixed of t_rect
-               | Func of (t_expr_resolver -> t_value)
-  let zeros = (0., 0., 0., 0.)
-            let is_zero r = r==zeros
-    let as_floats (a,b,c,d) = [|a;b;c;d;|]
-    let add_values a b =
-      let (a0,a1,a2,a3) = a in
-      let (b0,b1,b2,b3) = b in
-      (a0+.b0, a1+.b1, a2+.b2, a3+.b3)
-    let expand ?scale:(scale=1.0) a b =
-      let (a0,a1,a2,a3) = a in
-      let (b0,b1,b2,b3) = b in
-      (a0-.scale*.b0, a1-.scale*.b1, a2+.scale*.b2, a3+.scale*.b3)
-    let shrink ?scale:(scale=1.0) a b = expand ~scale:(-. scale) a b
-    let union a b =
-      if (is_zero a) then b else if (is_zero b) then a else (
-        let (a0,a1,(a2:float),a3) = a in
-        let (b0,b1,(b2:float),b3) = b in
-        ((min a0 b0), (min a1 b1), (max a2 b2), (max a3 b3))
-      )
-    let intersect a b =
-      if (is_zero a) then a else if (is_zero b) then b else (
-        let (a0,a1,a2,a3) = a in
-        let (b0,b1,b2,b3) = b in
-        let (r0,r1,r2,r3) = (max a0 b0, max a1 b1, min a2 b2, min a3 b3) in
-        if ((r2<=r0) || (r3<=r1)) then zeros else (r0,r1,r2,r3)
-      )
-    let translate ?scale:(scale=1.) r v =
-      let (xr, yr) = v in
-      let (x0,x1,y0,y1) = r in
-      (x0 +. xr*.scale, y0 +. yr*.scale, x1 +. xr*.scale, y1 +. yr*.scale)
-    let mk_fixed r = Fixed r
-    let value x n =
-      match x with
-      | Uniform f -> (f,f,f,f)
-      | Fixed r   -> r
-      | Func f -> value_rect (f n)
+  (*v zeros *)
+  let zeros = [|0.; 0.; 0.; 0.|]
 
-    let get_wh (d0,d1,d2,d3) =
-      (d2-.d0, d3-.d1)
+  (*f make a b c d *)
+  let make a b c d  = [|a; b; c; d; |]
+            
+  (*f is_zero *)
+  let is_zero r = r==zeros
 
-    let get_width (d0,_,d2,_) =
-      d2-.d0
+  (*f as_floats *)
+  let as_floats x = x
 
-    let get_height (_,d1,_,d3) =
-      d3-.d1
+  (*f as_vectors *)
+  let as_vectors ?close:(close=false) r =
+    if close then 
+      [| [|r.(0); r.(1);|];
+         [|r.(2); r.(1);|];
+         [|r.(2); r.(3);|];
+         [|r.(0); r.(3);|];
+         [|r.(0); r.(1);|];
+      |]
+    else
+      [| [|r.(0); r.(1);|];
+         [|r.(2); r.(1);|];
+         [|r.(2); r.(3);|];
+         [|r.(0); r.(3);|];
+      |]
 
-    let get_cwh (d0,d1,d2,d3) =
-      ((d0+.d2)/.2., (d1+.d3)/.2., d2-.d0, d3-.d1)
+  (*f add_values *)
+  let add_values a b = Array.map2 ( +. ) a b
 
-    let of_cwh (x,y,w,h) =
-      (x-.w/.2., y-.h/.2., x+.w/.2., y+.h/.2.)
-   
-    let str (a0,a1,a2,a3) = Printf.sprintf "(%f,%f,%f,%f)" a0 a1 a2 a3
+  (*f expand *)
+  let expand ?scale:(scale=1.0) a b =
+    [| a.(0)-.scale*.b.(0);
+       a.(1)-.scale*.b.(1);
+       a.(2)+.scale*.b.(2);
+       a.(3)+.scale*.b.(3) |]
+
+  (*f shrink *)
+  let shrink ?scale:(scale=1.0) a b = expand ~scale:(-. scale) a b
+
+  (*f union *)
+  let union a b =
+    if (is_zero a) then b else if (is_zero b) then a else (
+      [| (min a.(0) b.(0));
+         (min a.(1) b.(1));
+         (max a.(2) b.(2));
+         (max a.(3) b.(3)) |]
+    )
+  (*f intersect *)
+  let intersect a b =
+    if (is_zero a) then a else if (is_zero b) then b else (
+      let r0 = max a.(0) b.(0) in
+      let r1 = max a.(1) b.(1) in
+      let r2 = min a.(2) b.(2) in
+      let r3 = min a.(3) b.(3) in
+      if ((r2<=r0) || (r3<=r1)) then zeros else [|r0;r1;r2;r3|]
+    )
+  (*f translate *)
+  let translate ?scale:(scale=1.) r v =
+    [| r.(0) +. v.(0)*.scale;
+       r.(1) +. v.(1)*.scale;
+       r.(2) +. v.(0)*.scale;
+       r.(3) +. v.(1)*.scale |]
+
+  (*f get_wh *)
+  let get_wh r = (r.(2)-.r.(0), r.(3)-.r.(1))
+
+  (*f get_c *)
+  let get_c r =
+    ( (r.(0)+.r.(2))/.2.,
+      (r.(1)+.r.(3))/.2. )
+
+  (*f get_dim *)
+  let get_dim r = function
+    | 0 -> [|r.(0); r.(2)|]
+    | _ -> [|r.(1); r.(3)|]
+
+  (*f get_width *)
+  let get_width r = r.(2) -. r.(0)
+
+  (*f get_height *)
+  let get_height r = r.(3) -. r.(1)
+
+  (*f get_cwh *)
+  let get_cwh r =
+    ( (r.(0)+.r.(2))/.2.,
+      (r.(1)+.r.(3))/.2.,
+      r.(2)-.r.(0),
+      r.(3)-.r.(1))
+
+  (*f of_cwh *)
+  let of_cwh (x,y,w,h) =
+    [| x -. w/.2.;
+       y -. h/.2.;
+       x +. w/.2.;
+       y +. h/.2. |]
+
+  (*f str *)
+  let str r = Printf.sprintf "(%g,%g,%g,%g)" r.(0) r.(1) r.(2) r.(3)
+
+  (*f All done *)
+end
+
+(*m Vector module *)
+module Vector = struct
+  (*v zeros *)
+  let zeros = [|0.; 0.|]
+
+  (*f is_zero *)
+  let is_zero v = v==zeros
+
+  (*f make a b  *)
+  let make a b  = [|a; b; |]
+            
+  (*f as_floats *)
+  let as_floats x = x
+
+  (*f union *)
+  let union a b =
+    if (is_zero a) then b else if (is_zero b) then a else (
+      [| (min a.(0) b.(0));
+         (max a.(1) b.(1)) |]
+    )
+  (*f intersect *)
+  let intersect a b =
+    if (is_zero a) then a else if (is_zero b) then b else (
+      let r0 = max a.(0) b.(0) in
+      let r1 = min a.(1) b.(1) in
+      if (r1<=r0) then zeros else [|r0;r1|]
+    )
+
+  (*f add *)
+  let add ?scale:(scale=1.) a b =
+    [| a.(0) +. b.(0)*.scale;
+       a.(1) +. b.(1)*.scale |]
+
+  (*f len *)
+  let len ?scale:(scale=1.) a =
+    (a.(1) -. a.(0)) *. scale
+
+  (*f str *)
+  let str r = Printf.sprintf "(%g,%g)" r.(0) r.(1)
+
+  (*f All done *)
 end
 

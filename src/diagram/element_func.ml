@@ -227,11 +227,11 @@ module DesiredGeometryFunc (LE : LayoutElementAggrType) = struct
     let merged_bbox   = Rectangle.of_cwh (0.,0.,mw,mh) in
     let min_bbox      = Layout.expand_bbox rt.layout_properties merged_bbox in
     (* But can do ref point relative to centre *)
-    let (erx,ery) = Desired_geometry.get_ref element_geom in
+    let eref = Desired_geometry.get_ref element_geom in
     let (mbcx, mbcy, _, _) = Rectangle.get_cwh min_bbox in
-    let drx =erx -. ecx +. mbcx in
-    let dry =ery -. ecy +. mbcy in
-    let des_ref = (drx, dry) in
+    let drx = eref.(0) -. ecx +. mbcx in
+    let dry = eref.(1) -. ecy +. mbcy in
+    let des_ref = Primitives.Vector.make drx dry in
     let des_geom = Desired_geometry.(make des_ref min_bbox) in
     let properties = rt.properties in
     { th=rt.th; rt=rt.rt; properties; layout_properties=rt.layout_properties; eval=rt.eval; content_geom; element_geom; des_geom; layout; content_etb }

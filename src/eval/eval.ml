@@ -22,6 +22,7 @@ let value_make_vector  = Value.make_vector
 let value_of_float     = Value.of_float
 let value_of_floats    = Value.of_floats
 let value_of_floats2   = Value.of_floats2
+let value_of_floats_floats    = Value.of_floats_floats
 
 let value_as_float     = Value.as_float
 let value_as_floats    = Value.as_floats

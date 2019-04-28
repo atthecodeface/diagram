@@ -80,7 +80,9 @@ let resolve_styles et (resolver:t_style_resolver) =
   let line_spacing = Font.text_spacing font size in
   let max_width = List.fold_left (fun acc (w,_) -> if (w>acc) then w else acc) 0. text_widths in
   let height = ((float et.num_lines) *. text_height) +. ((float (et.num_lines - 1)) *. line_spacing) in
-  let des_geom = Desired_geometry.make (max_width *. (1.+.align)/.2.,height/.2.) (0.,0.,max_width,height) in
+  let ref_xy = Primitives.Vector.make (max_width *. (1.+.align)/.2.) (height/.2.) in
+  let bbox = Primitives.Rectangle.make 0. 0. max_width height in
+  let des_geom = Desired_geometry.make ref_xy bbox in
   let rt = {font; size; align; line_spacing; text_height; text_widths; des_geom} in
   (rt, [])
 
@@ -111,10 +113,11 @@ let make_layout_with_geometry et rt geom : lt * t_element_properties =
  *)
 let finalize_geometry et (rt:rt) (lt:lt) (resolver:t_style_resolver) = 
   let color = resolver.value_as_color_string  ~default:"black" Attr_names.color in
-  let (drx,dry) = Desired_geometry.get_ref rt.des_geom in
-  let (rx,ry) = Desired_geometry.get_ref lt in
+  let dr = Desired_geometry.get_ref rt.des_geom in
+  let r  = Desired_geometry.get_ref lt in
   (*let rx = rx -. drx in *)
-  let ry = ry -. dry in
+  let rx = r.(0)  in
+  let ry = r.(1) -. dr.(1) in
   let text_xy i (w,text) =
     let y = ry +. (float i) *. (rt.line_spacing +. rt.text_height) +. rt.text_height in
     (rx+.w*.rt.align,y)

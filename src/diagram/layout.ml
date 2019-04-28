@@ -44,18 +44,18 @@ type t_layout_properties = {
 (*f make_layout_hdr stylesheet styleable - get actual data from the provided properties *)
 let make_layout_hdr stylesheet styleable =
   let grid_value_of_n n ints =
-    match n with | 0 -> (0,0,0,0)
-                 | 1 -> (ints.(0),ints.(0),1,1)
-                 | _ -> (ints.(0),ints.(1),1,1)
+    match n with | 0 -> [| 0;0;0;0; |]
+                 | 1 -> [| ints.(0); ints.(0); 1; 1 |]
+                 | _ -> [| ints.(0); ints.(1); 1; 1 |]
   in
   let wh_value_of_n n floats =
-    match n with | 0 -> (0.,1.E20)
-                 | _ -> (floats.(0),1.E20)
+    match n with | 0 -> [|0. ; 1.E20 |]
+                 | _ -> [|floats.(0) ; 1.E20 |]
   in
   let pbm_value_of_n n floats =
-    match n with | 0 -> (0.,0.,0.,0.)
-                 | 1 -> (floats.(0),floats.(0),floats.(0),floats.(0))
-                 | _ -> (floats.(0),floats.(1),floats.(0),floats.(1))
+    match n with | 0 -> Primitives.Rectangle.zeros
+                 | 1 -> [| floats.(0); floats.(0); floats.(0); floats.(0) |]
+                 | _ -> [| floats.(0); floats.(1); floats.(0); floats.(1) |]
   in
   let open Properties in
   let magnets_per_side = get_property_int    stylesheet styleable            Attr_names.magnets_per_side in
@@ -85,9 +85,9 @@ let make_layout_hdr stylesheet styleable =
 let props_min_max mm_opt m =
   match mm_opt with 
   | None -> m
-  | Some (min, max) ->
-    let m = if (m<min) then min else m in
-    let m = if (m>max) then max else m in
+  | Some mm ->
+    let m = if (m<mm.(0)) then mm.(0) else m in
+    let m = if (m>mm.(1)) then mm.(1) else m in
     m
 
 (*f is_placed *)
@@ -147,23 +147,23 @@ let build_layout_data acc (cp,des_geom) =
   match cp.grid with
   | None -> (
   (* if it has a placement  then not 0,0 ...*)
-    let placement = (0., 0.) in
+    let placement = Primitives.Vector.zeros in
     let child_bbox = Primitives.Rectangle.translate (Desired_geometry.get_drext des_geom) placement in
     let place_bbox = Primitives.Rectangle.union place_bbox child_bbox in
     (gcl, grl, place_bbox)
   )
-  | Some (cs,rs,cw,rw) -> (
-    let (_,_,w,h) = Desired_geometry.get_cwh des_geom in
-    let gcl = (cs,cw,w)::gcl in
-    let grl = (rs,rw,h)::grl in
+  | Some gsw -> ( (* gsw is array cs, rs, cw, rw *)
+    let (w,h) = Desired_geometry.get_wh des_geom in
+    let gcl = (gsw.(0),gsw.(2),w)::gcl in
+    let grl = (gsw.(1),gsw.(3),h)::grl in
     (gcl, grl, place_bbox)
   )
 
 let create props children_props_geom =
-  let expand_default = 1. in
+  let expand_default = props.expand in
   let expand = [] in
   let (gcdx, gcdy, place_bbox) = List.fold_left build_layout_data ([],[],Primitives.Rectangle.zeros) children_props_geom in
-  let grids  = Array.map (Grid.make_placement expand_default expand) [|gcdx; gcdy|] in
+  let grids  = Array.mapi (fun i g -> Grid.make_placement expand_default.(i) expand g) [|gcdx; gcdy|] in
   let grid_sizes  = Array.map Grid.get_placement_size  grids  in
   let (pcx,pcy,pw,ph) = Primitives.Rectangle.get_cwh place_bbox in
   let cont_w = max grid_sizes.(0) pw in
@@ -171,7 +171,7 @@ let create props children_props_geom =
   let cont_w = props_min_max props.width  cont_w in
   let cont_h = props_min_max props.height cont_h in
   let min_bbox = Primitives.Rectangle.of_cwh (pcx, pcy, cont_w, cont_h) in
-  let cont_geom = Desired_geometry.make (pcx,pcy) min_bbox in
+  let cont_geom = Desired_geometry.make [|pcx;pcy|] min_bbox in
   let des_geom = Desired_geometry.(expand (expand (expand cont_geom props.padding) props.border) props.margin) in
   {props; grids; des_geom;}
 
@@ -180,6 +180,38 @@ let get_z_index t = t.props.z_index
 
 (*f get_desired_geometry - get the minimum bbox required by the content given grid and placemet (previously created as t) *)
 let get_desired_geometry t = t.des_geom
+
+(*f magnets_of_path mps path
+
+ if mps is <=2 then this is just the path coordinates
+
+ if mps is 3 then we want (side 0-1 at 0.0/1.; side 0-1 at 0.5/1.; side 1-2 at 0./1....)
+
+ *)
+let magnets_of_path mps path =
+  let n = (Array.length path)-1 in
+  let mps = max 2 mps in
+  let total_pts = (mps-1) * n in
+  let fmps = float (mps - 1) in
+  let f =
+    if mps<=2 then (
+      function i -> path.(i)
+    ) else (
+      function i -> (           
+        let side        = i / (mps-1) in
+        let ofs_in_side = i mod (mps-1) in
+        let x0 = path.(side).(0) in
+        let y0 = path.(side).(1) in
+        let x1 = path.(side+1).(0) in
+        let y1 = path.(side+1).(1) in
+        let dx = (x1 -. x0) *. (float ofs_in_side /. fmps) in
+        let dy = (y1 -. y0) *. (float ofs_in_side /. fmps) in
+        [| x0 +. dx ;
+           y0 +. dy ; |]
+      )
+    )
+  in
+  Ev_vectors (total_pts, (Array.init total_pts f))
 
 (*f layout_with_geometry
   shrink content bbox by padding/border/margin
@@ -196,9 +228,10 @@ let layout_with_geometry t geom =
     | None -> (None, content_geom)
     | Some f -> (
       let cref = Desired_geometry.get_ref content_geom in
-      let bbox = Desired_geometry.get_cwh content_geom in
+      let bbox_cx, bbox_cy  = Desired_geometry.get_c content_geom in
+      let bbox_w, bbox_h    = Desired_geometry.get_wh content_geom in
       let translate = Some cref in
-      let geom = Desired_geometry.make (0.,0.) (Primitives.Rectangle.translate ~scale:(-1.) bbox cref) in
+      let geom = Desired_geometry.make Primitives.Vector.zeros (Primitives.Rectangle.translate ~scale:(-1.) [|bbox_cx; bbox_cy; bbox_w; bbox_h; |] cref) in
       (translate, geom)
     )
   in
@@ -208,20 +241,9 @@ let layout_with_geometry t geom =
   let grids = [|gx; gy|] in
   let transform = {translate; geom=geom; content_geom; grids;} in (* bbox is used for the border generation - should include updated grid *)
     let magnets =
-      let (x0,y0,x1,y1)=Desired_geometry.get_bbox geom in
-      if (t.props.magnets_per_side>1) then (
-        let mps = t.props.magnets_per_side-1 in
-        let fmps = float mps in
-        let dx = (x1 -. x0) /. (float mps) in
-        let dy = (y1 -. y0) /. (float mps) in
-        let x_of_i i = if (i<=mps) then (float i) else if (i<=2*mps) then fmps            else if (i<=3*mps) then fmps-.(float (i-2*mps)) else 0. in
-        let y_of_i i = if (i<=mps) then 0.        else if (i<=2*mps) then (float (i-mps)) else if (i<=3*mps) then fmps                    else fmps-.(float (i-3*mps)) in
-        let xs = Array.init (mps*4) (fun i->let x=x_of_i i in x0+.dx*.x) in
-        let ys = Array.init (mps*4) (fun i->let y=y_of_i i in y0+.dy*.y) in
-        Ev_vectors ((mps*4),xs,ys)
-      ) else (
-        Ev_vectors (4,[|x0;x0;x1;x1|],[|y0;y1;y1;y0|])
-      )
+      let bbox = Desired_geometry.get_bbox geom in
+      let path = Primitives.Rectangle.as_vectors ~close:true bbox in
+      magnets_of_path t.props.magnets_per_side path
     in
     let layout_pl = [Attr_names.outer_bbox,Ev_rect    (Desired_geometry.get_bbox geom);
                      Attr_names.border_bbox,Ev_rect   (Desired_geometry.get_bbox border_geom);
@@ -236,19 +258,19 @@ let get_geom_element t tr cp des_geom =
   | None -> (
     tr.content_geom (* as we cannot place things yet *)
   )
-  | Some (cs,rs,cw,rw) -> (
-    let (x0,x1) = Grid.get_layout_bbox tr.grids.(0) cs cw in
-    let (y0,y1) = Grid.get_layout_bbox tr.grids.(1) rs rw in
-    let bbox = (x0,y0,x1,y1) in
-    let (cx,cy,_,_) = Primitives.Rectangle.get_cwh bbox in
+  | Some gsw -> ( (* gsw is (cs,rs,cw,rw) *)
+    let (x0,x1) = Grid.get_layout_bbox tr.grids.(0) gsw.(0) gsw.(2) in
+    let (y0,y1) = Grid.get_layout_bbox tr.grids.(1) gsw.(1) gsw.(3) in
+    let bbox = [|x0;y0;x1;y1|] in
+    let (cx,cy) = Primitives.Rectangle.get_c bbox in
     (* Printf.printf "get_geom_element %g,%g : %g,%g,%g,%g\n" cx cy x0 y0 x1 y1; *)
-    Desired_geometry.make (cx,cy) bbox
+    Desired_geometry.make [|cx;cy|] bbox
   )
 
 let acc_translate tr acc =
   match tr.translate with
   | None -> acc
-  | Some (dx,dy) -> (Printf.sprintf "translate(%g,%g)" dx dy)::acc
+  | Some v -> (Printf.sprintf "translate(%g,%g)" v.(0) v.(1))::acc
 
 let acc_rotation t acc =
   match t.props.rotation with
@@ -258,7 +280,7 @@ let acc_rotation t acc =
 let acc_scale t acc =
   match t.props.scale with
   | None -> acc
-  | Some (x,y) -> (Printf.sprintf "scale(%g,%g)" x y)::acc
+  | Some v -> (Printf.sprintf "scale(%g,%g)" v.(0) v.(1))::acc
 
 let add_transform_tag t tr tags =
   let transform = [] in
@@ -272,7 +294,11 @@ let add_transform_tag t tr tags =
 let path_ele t coords = String.concat " " (t::(List.map (Printf.sprintf "%g") coords))
 
 let svg_border_path_coords t (tr:t_transform) =
-  let (x0,y0,x1,y1) = Rectangle.(shrink ~scale:(0.5) (shrink (Desired_geometry.get_bbox tr.geom) t.props.margin) t.props.border)  in
+  let bbox = Rectangle.(shrink ~scale:(0.5) (shrink (Desired_geometry.get_bbox tr.geom) t.props.margin) t.props.border)  in
+  let x0 = bbox.(0) in
+  let y0 = bbox.(1) in
+  let x1 = bbox.(2) in
+  let y1 = bbox.(3) in
   let path_string = 
     match t.props.border_round with
     | None -> Printf.sprintf "M%g %g L%g %g L%g %g L%g %g Z" x0 y0 x1 y0 x1 y1 x0 y1
@@ -293,7 +319,7 @@ let svg_border_path_coords t (tr:t_transform) =
 
 let svg_prepend_fill t tr s =
   let coords = svg_border_path_coords t tr in
-  let (bw,_,_,_) = t.props.border in
+  let bw = t.props.border.(0) in (* Border stroke width is just taken from first border element *)
   if (Color.is_none t.props.border_fill) then s else 
     let stroke = Svg.attribute_string "stroke" "none" in
     let stroke_width = Svg.attribute_string "stroke-width" (Printf.sprintf "%g" bw) in
@@ -303,7 +329,7 @@ let svg_prepend_fill t tr s =
 
 let svg_append_border t tr s =
   let coords = svg_border_path_coords t tr in
-  let (bw,_,_,_) = t.props.border in
+  let bw = t.props.border.(0) in (* Border stroke width is just taken from first border element *)
   if (Color.is_none t.props.border_color) then s else 
     let stroke = Color.svg_attr "stroke" t.props.border_color in
     let stroke_width = Svg.attribute_string "stroke-width" (Printf.sprintf "%g" bw) in

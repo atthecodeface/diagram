@@ -81,8 +81,8 @@ let main () =
   Format.(pp_print_flush std_formatter ());
    *)
   let (w,h) = prepared_size etb in
-  let page_bbox = (0.,0.,w,h) in
-  let (lt, gt) = layout_elements (Desired_geometry.make (w/.2.,h/.2.) page_bbox) etb in
+  let page_bbox = [|0.; 0.; w; h |] in
+  let (lt, gt) = layout_elements (Desired_geometry.make (Primitives.Vector.make (w/.2.) (h/.2.)) page_bbox) etb in
   (*
   Diaglib.pp_layout Format.std_formatter lt;
   Diaglib.pp_geometry Format.std_formatter gt;

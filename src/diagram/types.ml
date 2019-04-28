@@ -1,13 +1,13 @@
 
 type t_id = int
-type t_int4 = int * int * int * int
-type t_rect = float * float * float * float
-type t_vector = float * float
-type t_value = | Scalar of float
-               | Rect of t_rect
-               | Int4 of t_int4
-               | Vector of t_vector
-               | String of string
+type t_int4   = int array   (* guaranteed to be 4 elements *)
+type t_rect   = float array (* guaranteed to be 4 elements *)
+type t_vector = float array (* guaranteed to be 2 elements *)
+type t_value  = | Scalar of float
+                | Rect of t_rect
+                | Int4 of t_int4
+                | Vector of t_vector
+                | String of string
 
 (*t th - Basic header *)
 type t_hdr = {
@@ -32,7 +32,7 @@ type t_element_value =
   | Ev_floats       of int * (float array)
   | Ev_float        of float
   | Ev_vector       of float * float
-  | Ev_vectors      of int * (float array) * (float array)
+  | Ev_vectors      of int * ((float array) array)
   | Ev_string       of string
 
 type t_element_properties = (string * t_element_value) list

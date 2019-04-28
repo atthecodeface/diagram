@@ -107,19 +107,19 @@ let get_property_float_option stylesheet styleable name =
 let get_property_vector ?value_of_n stylesheet styleable name =
     let f = Stylesheet.styleable_value_as_floats stylesheet styleable name in
     let n = Array.length f in
-    if (n<2) then (invoke_if_some value_of_n n f) else (f.(0), f.(1))
+    if (n<2) then (invoke_if_some value_of_n n f) else f
 
 let get_property_vector_option ?value_of_n stylesheet styleable name =
   if Stylesheet.styleable_value_is_none stylesheet styleable name then None else (
     let f = Stylesheet.styleable_value_as_floats stylesheet styleable name in
     let n = Array.length f in
-    if (n<2) then Some (invoke_if_some value_of_n n f) else Some (f.(0), f.(1))
+    if (n<2) then Some (invoke_if_some value_of_n n f) else Some f
   )
 
 let get_property_rect ?value_of_n stylesheet styleable name =
     let f = Stylesheet.styleable_value_as_floats stylesheet styleable name in
     let n = Array.length f in
-    if (n<4) then (invoke_if_some value_of_n n f) else (f.(0), f.(1), f.(2), f.(3))
+    if (n<4) then (invoke_if_some value_of_n n f) else f
 
 let get_property_int stylesheet styleable name =
     Stylesheet.styleable_value_as_int stylesheet styleable name
@@ -127,13 +127,13 @@ let get_property_int stylesheet styleable name =
 let get_property_int4 ?value_of_n stylesheet styleable name =
     let f = Stylesheet.styleable_value_as_ints stylesheet styleable name in
     let n = Array.length f in
-    if (n<4) then (invoke_if_some value_of_n n f) else (f.(0), f.(1), f.(2), f.(3))
+    if (n<4) then (invoke_if_some value_of_n n f) else f
 
 let get_property_int4_option ?value_of_n stylesheet styleable name =
   if Stylesheet.styleable_value_is_none stylesheet styleable name then None else (
     let f = Stylesheet.styleable_value_as_ints stylesheet styleable name in
     let n = Array.length f in
-    if (n<4) then Some (invoke_if_some value_of_n n f) else Some (f.(0), f.(1), f.(2), f.(3))
+    if (n<4) then Some (invoke_if_some value_of_n n f) else Some f
   )
 
 let get_property_color stylesheet styleable name =

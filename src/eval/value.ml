@@ -133,6 +133,14 @@ let of_floats2 arr0 arr1 s n =
   let na = Array.init n fill in
   Subarray (0,n,na)
 
+(*f of_floats_floats ((float array) array) -> int -> int -> t as Subarray of Vector
+    Build Array of vectors from xys as one array of float arrays
+ *)
+let of_floats_floats arr s n = 
+  let fill i =  Vector (arr.(s+i).(0), arr.(s+i).(1)) in
+  let na = Array.init n fill in
+  Subarray (0,n,na)
+
 (*a Functions to apply to values and arrays etc *)
 (*f apply_unary_float_fn (float -> float) -> t -> t *)
 let rec apply_unary_float_fn fn = function
