@@ -13,5 +13,6 @@ all: hml.pdf diagram.pdf
 	@${PANDOC} $*.md -o $@
 
 
-diagram.pdf: grid.svg flow.svg box.svg
+diagram.pdf: grid.svg flow.svg box.svg rot_text.svg rot_box.svg rot_box2.svg rot_grid.svg
+
 

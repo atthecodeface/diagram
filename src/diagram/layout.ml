@@ -94,9 +94,6 @@ let props_min_max mm_opt m =
 let is_placed t = 
   match t.grid with | None -> true | _ -> false
 
-(*f expand_bbox - expand a bbox by the padding, border and margin *)
-let expand_bbox t bbox = Rectangle.(expand (expand (expand bbox t.padding) t.border) t.margin)
-
 (*a Types *)
 (*t t - structure of a desired layout
   props is the layout properties used - these are not recalculated for placement
@@ -116,6 +113,7 @@ let expand_bbox t bbox = Rectangle.(expand (expand (expand bbox t.padding) t.bor
 type t = {
     props  : t_layout_properties;
     grids  : Grid.t_placement array;
+    cont_geom : t_ref_bbox; (* prior to margin expansion etc *)
     des_geom : t_ref_bbox;
   }
 
@@ -128,19 +126,7 @@ content_geom   : t_ref_bbox; (* bounding box for content to be displayed in *)
   }
 
 (*a Toplevel Layout module *)
-(*f create : t_layout_properties -> (t_layout_properties * t_desired_geometry) list -> t
-
-  Create the appropriate layout for the content (not this element) and determine the min_bbox given properties of this
-  and the properties and min_bbox of contents
-
-  Start off with no desired placed geometry
-  If a child has a grid then add its dimensions to the grid_x and grid_y
-  Else if it is placed then its (ref,bbox) contributes as (bbox rel to ref + place)
-
-  Calculate the required width/height for the grid (if any)
-
-  Create final bbox that is centred on placed bbox center; (0,0) if none
-  Final geometry is reference point place centre, bbox final bbox
+(*f build_layout_data : (gcl * grl * bbox) -> (t_layout_properties * t_desired_geometry) -> (gcl * grl * bbox)
  *)
 let build_layout_data acc (cp,des_geom) =
   let (gcl, grl, place_bbox) = acc in
@@ -159,21 +145,45 @@ let build_layout_data acc (cp,des_geom) =
     (gcl, grl, place_bbox)
   )
 
-let create props children_props_geom =
+(*f create : t_layout_properties -> (t_layout_properties * t_desired_geometry) list -> t
+
+  Create the appropriate layout for the content (not this element) and determine the min_bbox given properties of this
+  and the properties and min_bbox of contents
+
+  Start off with no desired placed geometry
+  If a child has a grid then add its dimensions to the grid_x and grid_y
+  Else if it is placed then its (ref,bbox) contributes as (bbox rel to ref + place)
+
+  Calculate the required width/height for the grid (if any)
+
+  Create final bbox that is centred on placed bbox center; (0,0) if none
+  Final geometry is reference point place centre, bbox final bbox
+ *)
+let create props element_geom children_props_geom =
   let expand_default = props.expand in
   let expand = [] in
   let (gcdx, gcdy, place_bbox) = List.fold_left build_layout_data ([],[],Primitives.Rectangle.zeros) children_props_geom in
   let grids  = Array.mapi (fun i g -> Grid.make_placement expand_default.(i) expand g) [|gcdx; gcdy|] in
-  let grid_sizes  = Array.map Grid.get_placement_size  grids  in
-  let (pcx,pcy,pw,ph) = Primitives.Rectangle.get_cwh place_bbox in
-  let cont_w = max grid_sizes.(0) pw in
-  let cont_h = max grid_sizes.(1) ph in
-  let cont_w = props_min_max props.width  cont_w in
-  let cont_h = props_min_max props.height cont_h in
-  let min_bbox = Primitives.Rectangle.of_cwh (pcx, pcy, cont_w, cont_h) in
-  let cont_geom = Desired_geometry.make [|pcx;pcy|] min_bbox in
+  let grid_sizes = Array.map Grid.get_placement_size  grids  in
+  let (pw, ph)   = Primitives.Rectangle.get_wh place_bbox in
+  let (ew, eh)   = Desired_geometry.get_wh element_geom in
+  let cont_w = max (max grid_sizes.(0) pw) ew in
+  let cont_h = max (max grid_sizes.(1) ph) eh in
+  let cont_wh = match props.rotation with
+    | None   -> [| cont_w; cont_h |]
+    | Some f -> (
+      let r = Primitives.Rectangle.make 0. 0. cont_w cont_h  in
+      let r = Primitives.Rectangle.rotate_around r Primitives.Vector.zeros f in
+      let (w,h) = Primitives.Rectangle.get_wh r in
+      [|w; h|]
+    )
+  in
+  let cont_w = props_min_max props.width  cont_wh.(0) in
+  let cont_h = props_min_max props.height cont_wh.(1) in
+  let cont_bbox = Primitives.Rectangle.of_cwh (0., 0., cont_w, cont_h) in
+  let cont_geom = Desired_geometry.make Primitives.Vector.zeros cont_bbox in
   let des_geom = Desired_geometry.(expand (expand (expand cont_geom props.padding) props.border) props.margin) in
-  {props; grids; des_geom;}
+  {props; grids; des_geom; cont_geom}
 
 (*f get_z_index - get the z_index *)
 let get_z_index t = t.props.z_index
@@ -223,23 +233,35 @@ let layout_with_geometry t geom =
   let border_geom   = Desired_geometry.(shrink geom        t.props.margin) in
   let padded_geom   = Desired_geometry.(shrink border_geom t.props.border) in
   let internal_geom = Desired_geometry.(shrink padded_geom t.props.padding) in
-  let content_geom  = Desired_geometry.fit_within internal_geom t.des_geom t.props.anchor t.props.expand in
   let (translate, content_geom) = match t.props.rotation with
-    | None -> (None, content_geom)
+    | None -> (None, internal_geom)
     | Some f -> (
-      let cref = Desired_geometry.get_ref content_geom in
-      let bbox_cx, bbox_cy  = Desired_geometry.get_c content_geom in
-      let bbox_w, bbox_h    = Desired_geometry.get_wh content_geom in
+      (* let cref = Desired_geometry.get_ref internal_geom in ... cref is not required *)
+      let (icx,icy,iw,ih) = Desired_geometry.get_cwh internal_geom in
+      let (_,_,cw,ch) = Desired_geometry.get_cwh t.cont_geom in
+      let (width,height) = Primitives.Rectangle.wh_of_largest_area_within iw ih f in
+      let cref = Primitives.Vector.make icx icy in
+      (* Printf.printf "Rot %g,%g %g gives %g,%g\n" cw ch f width height; *)
+      let bbox =
+        if ((width>=cw) && (height>=ch)) then
+          Primitives.Rectangle.of_cwh (0.,0.,width,height)
+        else
+          Primitives.Rectangle.of_cwh (0.,0.,cw,ch)
+      in
+      (* (Primitives.Rectangle.translate ~scale:(-1.) bbox cref) *)
       let translate = Some cref in
-      let geom = Desired_geometry.make Primitives.Vector.zeros (Primitives.Rectangle.translate ~scale:(-1.) [|bbox_cx; bbox_cy; bbox_w; bbox_h; |] cref) in
-      (translate, geom)
+      let content_geom = Desired_geometry.make Primitives.Vector.zeros bbox in
+      (translate, content_geom)
     )
   in
-  let (ccx,ccy,cw,ch) = Desired_geometry.get_cwh content_geom in
+  (* fitted_content_geom is mapping the desired content geometry in to the width/height of our actual content_geom
+    the incoming reference point is irrelevant? *)
+  let fitted_content_geom  = Desired_geometry.fit_within content_geom t.cont_geom t.props.anchor t.props.expand in
+  let (ccx,ccy,cw,ch) = Desired_geometry.get_cwh fitted_content_geom in
   let gx = Grid.make_layout t.grids.(0) ccx cw in
   let gy = Grid.make_layout t.grids.(1) ccy ch in
   let grids = [|gx; gy|] in
-  let transform = {translate; geom=geom; content_geom; grids;} in (* bbox is used for the border generation - should include updated grid *)
+  let transform = {translate; geom=geom; content_geom=fitted_content_geom; grids;} in (* geom is used for the border generation - should include updated grid *)
     let magnets =
       let bbox = Desired_geometry.get_bbox geom in
       let path = Primitives.Rectangle.as_vectors ~close:true bbox in
@@ -253,6 +275,7 @@ let layout_with_geometry t geom =
                       ] in
     (transform, content_geom, layout_pl)
 
+(*f get_geom_element *)
 let get_geom_element t tr cp des_geom = 
   match cp.grid with
   | None -> (
@@ -261,27 +284,31 @@ let get_geom_element t tr cp des_geom =
   | Some gsw -> ( (* gsw is (cs,rs,cw,rw) *)
     let (x0,x1) = Grid.get_layout_bbox tr.grids.(0) gsw.(0) gsw.(2) in
     let (y0,y1) = Grid.get_layout_bbox tr.grids.(1) gsw.(1) gsw.(3) in
-    let bbox = [|x0;y0;x1;y1|] in
+    let bbox = Primitives.Rectangle.make x0 y0 x1 y1 in
     let (cx,cy) = Primitives.Rectangle.get_c bbox in
     (* Printf.printf "get_geom_element %g,%g : %g,%g,%g,%g\n" cx cy x0 y0 x1 y1; *)
     Desired_geometry.make [|cx;cy|] bbox
   )
 
+(*f acc_translate *)
 let acc_translate tr acc =
   match tr.translate with
   | None -> acc
   | Some v -> (Printf.sprintf "translate(%g,%g)" v.(0) v.(1))::acc
 
+(*f acc_rotation *)
 let acc_rotation t acc =
   match t.props.rotation with
   | None -> acc
   | Some f -> (Printf.sprintf "rotate(%g)" f)::acc
 
+(*f acc_scale *)
 let acc_scale t acc =
   match t.props.scale with
   | None -> acc
   | Some v -> (Printf.sprintf "scale(%g,%g)" v.(0) v.(1))::acc
 
+(*f add_transform_tag *)
 let add_transform_tag t tr tags =
   let transform = [] in
   let transform = acc_rotation  t  transform in
@@ -291,8 +318,10 @@ let add_transform_tag t tr tags =
   | [] -> tags
   | _ -> (Svg.attribute_string "transform" (String.concat " " transform)) :: tags
 
+(*f path_ele *)
 let path_ele t coords = String.concat " " (t::(List.map (Printf.sprintf "%g") coords))
 
+(*f svg_border_path_coords *)
 let svg_border_path_coords t (tr:t_transform) =
   let bbox = Rectangle.(shrink ~scale:(0.5) (shrink (Desired_geometry.get_bbox tr.geom) t.props.margin) t.props.border)  in
   let x0 = bbox.(0) in
@@ -338,14 +367,22 @@ let svg_append_border t tr s =
     s @ [path]
 
 let render_svg t tr id z_index make_element_svg svg_contents =
-  let (id_attrs,svg_contents) =
+  let id_attrs, svg_contents =
     if t.props.z_index = z_index then (
-      let svg_contents = (make_element_svg z_index) @ svg_contents in
-      let svg_contents = svg_prepend_fill  t tr svg_contents in
-      let svg_contents = svg_append_border t tr svg_contents in
-      ([Svg.attribute_string "id" id], svg_contents)
-    ) else ( [], svg_contents )
+      ([Svg.attribute_string "id" id], (make_element_svg z_index) @ svg_contents)
+    ) else (
+      ([],svg_contents)
+    )
   in
+  let svg_contents = 
     match svg_contents with 
     | [] -> []
     | s -> [ Svg.tag "g" (add_transform_tag t tr id_attrs) s []]
+  in
+  if (t.props.z_index = z_index) then (
+    let svg_contents = svg_prepend_fill  t tr svg_contents in
+    let svg_contents = svg_append_border t tr svg_contents in
+    [Svg.tag "g" [] svg_contents []]
+  ) else (
+    svg_contents
+  )

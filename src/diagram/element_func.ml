@@ -94,7 +94,6 @@ module TypeFunc(LE : LayoutElementAggrType) = struct
       properties : (string * t_element_value) list;
       layout_properties  : Layout.t_layout_properties;
       eval : Eval.t_eval;
-      content_geom : t_ref_bbox; (* Desired geometry of children laid out *)
       element_geom : t_ref_bbox; (* Desired geometry of element *)
       des_geom     : t_ref_bbox; (* Minimum bbox relateive to element ref point *)
       layout       : Layout.t;
@@ -202,9 +201,9 @@ module DesiredGeometryFunc (LE : LayoutElementAggrType) = struct
   type t = Types.t_desired_geometry
 
   (*f layout_content_create - create layout using any necessary et properties and etb content *)
-  let layout_content_create (rt:Types.t_resolved_style) etb_list =
+  let layout_content_create (rt:Types.t_resolved_style) element_geom etb_list =
     let content_layout_properties_bbox = List.map (fun (x:t)->(x.layout_properties,x.des_geom)) etb_list in
-    Layout.create rt.layout_properties content_layout_properties_bbox 
+    Layout.create rt.layout_properties element_geom content_layout_properties_bbox 
 
   (*f make rt : etb - create a structure with the min_bbox of the element given its properties
 
@@ -217,24 +216,10 @@ module DesiredGeometryFunc (LE : LayoutElementAggrType) = struct
   let rec make (rt:Types.t_resolved_style) : t =
     let content_etb   = List.map make rt.content_rt in
     let element_geom  = LE.get_desired_geometry rt.rt in
-    let layout        = layout_content_create rt content_etb in
-    let content_geom  = Layout.get_desired_geometry layout in
-
-    let (ecx,ecy,ew,eh)  = Desired_geometry.get_cwh element_geom in
-    let (_,_,cw,ch)  = Desired_geometry.get_cwh content_geom in
-    let mw = max cw ew in
-    let mh = max ch eh in
-    let merged_bbox   = Rectangle.of_cwh (0.,0.,mw,mh) in
-    let min_bbox      = Layout.expand_bbox rt.layout_properties merged_bbox in
-    (* But can do ref point relative to centre *)
-    let eref = Desired_geometry.get_ref element_geom in
-    let (mbcx, mbcy, _, _) = Rectangle.get_cwh min_bbox in
-    let drx = eref.(0) -. ecx +. mbcx in
-    let dry = eref.(1) -. ecy +. mbcy in
-    let des_ref = Primitives.Vector.make drx dry in
-    let des_geom = Desired_geometry.(make des_ref min_bbox) in
+    let layout        = layout_content_create rt element_geom content_etb in
+    let des_geom      = Layout.get_desired_geometry layout in
     let properties = rt.properties in
-    { th=rt.th; rt=rt.rt; properties; layout_properties=rt.layout_properties; eval=rt.eval; content_geom; element_geom; des_geom; layout; content_etb }
+    { th=rt.th; rt=rt.rt; properties; layout_properties=rt.layout_properties; eval=rt.eval; element_geom; des_geom; layout; content_etb }
 
   (*f get_des_geom *)
   let get_des_geom (etb:t) = etb.des_geom
@@ -244,7 +229,6 @@ module DesiredGeometryFunc (LE : LayoutElementAggrType) = struct
     Format.fprintf ppf "@[<v 3>";
     pp_open ppf (LE.type_name_rt etb.rt) etb.th;
     Format.fprintf ppf "element geom: %s " (Desired_geometry.str etb.element_geom);
-    Format.fprintf ppf "children geom:%s " (Desired_geometry.str etb.content_geom);
     Format.fprintf ppf "combined geom (inc border etc): %s " (Desired_geometry.str etb.des_geom);
     Format.fprintf ppf "@,";
     List.iter (pp ppf) etb.content_etb;

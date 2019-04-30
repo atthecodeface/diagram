@@ -173,6 +173,20 @@ specify a fixed value the attribute should be '<fixed> <fixed>'.
 Attribute 'rotation'
 --------------------
 
+![box grid (text rotate)](rot_box.svg "Rot box"){ width=80% }
+
+And text
+
+![box grid rotate (text)](rot_box2.svg "Rot box2"){ width=80% }
+
+And text
+
+![text grid rotate](rot_text.svg "Rot text"){ width=80% }
+
+And grid
+
+![text grid rotate](rot_grid.svg "Rot grid"){ width=80% }
+
 Attribute 'scale'
 -----------------
 
